@@ -15,8 +15,7 @@ import java.util.*;
  * @createDate 2024/6/13 14:53
  **/
 public class CodeAuditMain {
-    private static String result1;
-    private static String sqlrep;
+
     public static void main(String[] args) throws Exception {
         // 项目根目录
         File rootDir = new File(args[0]);
@@ -27,10 +26,11 @@ public class CodeAuditMain {
 
         // 存储XML文件中解析到的Mapper接口名及其文件路径
         Map<String, String> namespaceToPathMap = new HashMap<>();
+        Map<String, List<String>> namespaceToVulnerableMethodsMap = new HashMap<>();
 
         // 解析每个XML文件，查找SQL注入点和namespace
         for (File xmlFile : xmlFiles) {
-            result1 = scanMyBatisXML(xmlFile, namespaceToPathMap);
+            scanMyBatisXML(xmlFile, namespaceToPathMap, namespaceToVulnerableMethodsMap);
         }
 
         // 递归扫描目录，查找所有Java文件
@@ -41,7 +41,8 @@ public class CodeAuditMain {
         for (Map.Entry<String, String> entry : namespaceToPathMap.entrySet()) {
             String namespace = entry.getKey();
             String xmlFilePath = entry.getValue();
-            findMapperInterface(namespace, xmlFilePath, javaFiles, result1);
+            List<String> vulnerableMethods = namespaceToVulnerableMethodsMap.get(namespace);
+            findMapperInterface(namespace, xmlFilePath, javaFiles, vulnerableMethods);
         }
     }
 
@@ -72,7 +73,7 @@ public class CodeAuditMain {
     }
 
     // 扫描单个MyBatis XML文件，查找SQL注入点和namespace
-    public static String scanMyBatisXML(File xmlFile, Map<String, String> namespaceToPathMap) throws Exception {
+    public static void scanMyBatisXML(File xmlFile, Map<String, String> namespaceToPathMap, Map<String, List<String>> namespaceToVulnerableMethodsMap) throws Exception {
         // 使用SAX解析XML文件，获取每个节点的行号
         XMLInputFactory factory = XMLInputFactory.newInstance();
         XMLStreamReader reader = factory.createXMLStreamReader(new FileInputStream(xmlFile));
@@ -87,6 +88,7 @@ public class CodeAuditMain {
                     namespace = reader.getAttributeValue(null, "namespace");
                     if (namespace != null) {
                         namespaceToPathMap.put(namespace, xmlFile.getAbsolutePath());
+                        namespaceToVulnerableMethodsMap.put(namespace, new ArrayList<>());
                     }
                 } else if (Arrays.asList("select", "insert", "update", "delete").contains(elementName)) {
                     String id = reader.getAttributeValue(null, "id");
@@ -95,12 +97,14 @@ public class CodeAuditMain {
 
                     // 检查是否存在潜在的SQL注入点
                     if (sql.contains("${")) {
-                        sqlrep = xmlFile.getName() + "的 " + id + " 方法存在注入，在第" + lineNumber + "行，";
+                        System.out.printf("%s 的 %s 方法存在注入，在第 %d 行%n", xmlFile.getName(), id, lineNumber);
+                        if (namespace != null) {
+                            namespaceToVulnerableMethodsMap.get(namespace).add(id);
+                        }
                     }
                 }
             }
         }
-        return sqlrep;
     }
 
     // 获取XML元素的文本内容
@@ -118,53 +122,33 @@ public class CodeAuditMain {
     }
 
     // 查找并输出Mapper接口文件中存在漏洞的方法
-    public static void findMapperInterface(String namespace, String xmlFilePath, List<File> javaFiles,String result1) {
+    public static void findMapperInterface(String namespace, String xmlFilePath, List<File> javaFiles, List<String> vulnerableMethods) {
         String interfaceName = namespace.substring(namespace.lastIndexOf('.') + 1) + ".java";
-        String mapperFileName = Paths.get(xmlFilePath).getFileName().toString().replace(".xml", ".java");
 
         for (File javaFile : javaFiles) {
-            if (javaFile.getName().equals(interfaceName) && javaFile.getName().equals(mapperFileName)) {
+            if (javaFile.getName().equals(interfaceName)) {
+                boolean foundVulnerableMethod = false;
+                List<String> lines;
                 try {
-                    List<String> lines = Files.readAllLines(javaFile.toPath());
+                    lines = Files.readAllLines(javaFile.toPath());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    continue;
+                }
+
+                for (String methodName : vulnerableMethods) {
                     for (int i = 0; i < lines.size(); i++) {
-                        String line = lines.get(i);
-                        for (String methodName : getVulnerableMethods(xmlFilePath)) {
-                            if (line.contains(methodName)) {
-                               System.out.println(result1 + "接口：" + javaFile.getName());
+                        String line = lines.get(i).trim();
+                        if (line.startsWith("public") && line.contains(methodName + "(")) {
+                            if (!foundVulnerableMethod) {
+                                System.out.printf("%s 对应的接口文件：%s%n", Paths.get(xmlFilePath).getFileName(), javaFile.getAbsolutePath());
+                                foundVulnerableMethod = true;
                             }
                         }
                     }
-                } catch (IOException e) {
-                    e.printStackTrace();
                 }
                 break; // 找到匹配的接口文件后退出循环
             }
         }
-    }
-
-    // 获取存在漏洞的方法名（从XML文件解析的SQL注入点）
-    private static List<String> getVulnerableMethods(String xmlFilePath) {
-        List<String> vulnerableMethods = new ArrayList<>();
-        try {
-            XMLInputFactory factory = XMLInputFactory.newInstance();
-            XMLStreamReader reader = factory.createXMLStreamReader(new FileInputStream(xmlFilePath));
-
-            while (reader.hasNext()) {
-                int event = reader.next();
-                if (event == XMLStreamConstants.START_ELEMENT) {
-                    String elementName = reader.getLocalName();
-                    if (Arrays.asList("select", "insert", "update", "delete").contains(elementName)) {
-                        String id = reader.getAttributeValue(null, "id");
-                        String sql = getElementText(reader);
-                        if (sql.contains("${")) {
-                            vulnerableMethods.add(id);
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return vulnerableMethods;
     }
 }
