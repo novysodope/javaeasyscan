@@ -14,6 +14,8 @@ import com.github.javaparser.symbolsolver.model.resolution.TypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.JavaParserTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeSolver;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamConstants;
@@ -22,6 +24,7 @@ import javax.xml.stream.XMLStreamReader;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 /**
@@ -32,6 +35,7 @@ import java.util.*;
  **/
 
 public class SQLInjectScan {
+    private static final Logger logger = LoggerFactory.getLogger(SQLInjectScan.class);
 
     // 优化输出，显示完整的调用链
     static class VulnerabilityDetail {
@@ -61,7 +65,7 @@ public class SQLInjectScan {
 
         List<String> getFormattedOutput() {
             List<String> outputs = new ArrayList<>();
-            String base = String.format("%s 的 %s 方法存在注入，在第 %d 行：%n%s%n", xmlFile, methodName, xmlLineNumber, vulnerableLineContent);
+            String base = String.format("%s 的 %s 方法存在注入，在第 %d 行：%n<pre style=\"color:red;\">%s</pre>%n", xmlFile, methodName, xmlLineNumber, vulnerableLineContent);
 
             if (implCalls.isEmpty() && controllerCalls.isEmpty()) {
                 outputs.add(base);
@@ -72,7 +76,7 @@ public class SQLInjectScan {
                         outputs.add(implChain);
                     } else {
                         for (String controllerCall : controllerCalls) {
-                            outputs.add(implChain + "，" + controllerCall);
+                            outputs.add(implChain +  controllerCall);
                         }
                     }
                 }
@@ -84,6 +88,7 @@ public class SQLInjectScan {
 
     public static void main(String[] args) throws Exception {
         File rootDir = new File(args[0]);
+        logger.info("project: " + rootDir.getAbsolutePath());
         List<File> xmlFiles = new ArrayList<>();
         collectXmlFiles(rootDir, xmlFiles);
 
@@ -93,8 +98,8 @@ public class SQLInjectScan {
 
         for (File xmlFile : xmlFiles) {
             scanMyBatisXML(xmlFile, namespaceToPathMap, namespaceToVulnerabilitiesMap);
+            logger.info("scan xml file: " + xmlFile.getName());
         }
-
         List<File> javaFiles = new ArrayList<>();
 
         // 确认Mapper接口文件中存在XML文件里存在漏洞的方法，这个操作是确保这个方法出现在整个数据库操作流程中（保证他被用到），减少误报
@@ -116,11 +121,14 @@ public class SQLInjectScan {
                 results.addAll(outputs);
             }
         }
-
-        for (String result : results) {
-            System.out.println(result);
+        
+        if (results!=null || !results.equals("")) {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss");
+            String timestamp = sdf.format(new Date());
+            generateHtmlReport(results, "audit_report_" + timestamp + ".html");
+        }else {
+            System.out.println("\nnot found result\n");
         }
-        generateHtmlReport(results, "audit_report.html");
     }
 
     public static void collectXmlFiles(File dir, List<File> xmlFiles) {
@@ -170,7 +178,9 @@ public class SQLInjectScan {
                     currentLine = reader.getLocation().getLineNumber();
 
                     if (sql.contains("${")) {
+                        logger.info("find sqlinject: " + sql);
                         if (namespace != null) {
+                            logger.info("location: " + namespace);
                             namespaceToVulnerabilitiesMap.get(namespace).add(new VulnerabilityDetail(xmlFile.getName(), id, currentLine, sql.trim()));
                         }
                     }
@@ -262,7 +272,12 @@ public class SQLInjectScan {
                                                     if (found) {
                                                         VulnerabilityDetail vulnerability = vulnerabilities.stream().filter(v -> v.methodName.equals(methodCall.getNameAsString())).findFirst().orElse(null);
                                                         if (vulnerability != null) {
-                                                            vulnerability.addImplCall(String.format("调用信息如下:%n%s 类实现了接口 %s , 调用了 %s 的 %s 方法", className, String.join(", ", implementedInterfaces), mapperInterfaceName, methodCall.getNameAsString()));
+                                                            String vulnerableLineContent = getLineContent(javaFile, methodCall.getBegin().get().line - 1);
+                                                            vulnerability.addImplCall(String.format("<b>调用信息如下:</b>%n%n%s 类实现了接口 %s , 该实现类调用了 %s 的 %s 方法：%n<pre style=\"color:red;\">%s</pre>%n", className, String.join(", ", implementedInterfaces), mapperInterfaceName, methodCall.getNameAsString(),vulnerableLineContent));
+                                                            logger.info("mapper: " + mapperInterfaceName);
+                                                            logger.info("methodName: " + vulnerability.methodName);
+                                                            logger.info("interfece: " + implementedInterfaces);
+                                                            logger.info("implements: " + className);
                                                             implementedInterfaces.forEach(interfaceName -> {
                                                                 interfaceToVulnerabilitiesMap.putIfAbsent(interfaceName, new ArrayList<>());
                                                                 interfaceToVulnerabilitiesMap.get(interfaceName).add(vulnerability);
@@ -316,8 +331,9 @@ public class SQLInjectScan {
                                                     String met = methodCall.toString().toLowerCase();
                                                     if (interfaceName != null && met.contains(intfmet)) {
                                                         String vulnerableLineContent = getLineContent(javaFile, methodCall.getBegin().get().line - 1);
-                                                        vulnerability.addControllerCall(String.format("%s 类的 %s 方法调用了接口 %s 的 %s 方法，在第 %d 行：%n%s%n",
+                                                        vulnerability.addControllerCall(String.format("往上跟进被实现的接口发现，%s 类的 %s 方法调用了被实现接口 %s 的 %s 方法，在第 %d 行：%n<pre style=\"color:red;\">%s</pre>%n",
                                                                 controllerClassName, method.getNameAsString(), interfaceName, methodCall.getNameAsString(), methodCall.getBegin().get().line, vulnerableLineContent));
+                                                        logger.info("controller: " + controllerClassName);
                                                     }
                                                 });
                                             });
@@ -388,6 +404,7 @@ public class SQLInjectScan {
             writer.println("</script>");
             writer.println("</body>");
             writer.println("</html>");
+            logger.info("create report: " + filePath);
         } catch (IOException e) {
             e.printStackTrace();
         }
