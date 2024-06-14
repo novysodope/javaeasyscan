@@ -82,16 +82,19 @@ public class CodeAuditMain {
         File rootDir = new File(args[0]);
         List<File> xmlFiles = new ArrayList<>();
         collectXmlFiles(rootDir, xmlFiles);
+
         //用来存储解析到的Mapper接口名和他的文件路径，方便后续去查找对应的调用
         Map<String, String> namespaceToPathMap = new HashMap<>();
         Map<String, List<VulnerabilityDetail>> namespaceToVulnerabilitiesMap = new HashMap<>();
+
         for (File xmlFile : xmlFiles) {
             scanMyBatisXML(xmlFile, namespaceToPathMap, namespaceToVulnerabilitiesMap);
         }
 
         List<File> javaFiles = new ArrayList<>();
-        collectJavaFiles(rootDir, javaFiles);
+
         //确认Mapper接口文件中存在XML文件里存在漏洞的方法，这个操作是确保这个方法出现在整个数据库操作流程中（保证他被用到），减少误报
+        collectJavaFiles(rootDir, javaFiles);
         for (Map.Entry<String, String> entry : namespaceToPathMap.entrySet()) {
             String namespace = entry.getKey();
             String xmlFilePath = entry.getValue();
@@ -102,14 +105,18 @@ public class CodeAuditMain {
         Map<String, List<VulnerabilityDetail>> interfaceToVulnerabilitiesMap = findImplementationsAndMethodCalls(namespaceToVulnerabilitiesMap, javaFiles);
         findRequestMappingCalls(interfaceToVulnerabilitiesMap, javaFiles);
 
+        List<String> results = new ArrayList<>();
         for (List<VulnerabilityDetail> vulnerabilities : namespaceToVulnerabilitiesMap.values()) {
             for (VulnerabilityDetail vulnerability : vulnerabilities) {
                 List<String> outputs = vulnerability.getFormattedOutput();
-                for (String output : outputs) {
-                    System.out.println(output);
-                }
+                results.addAll(outputs);
             }
         }
+
+        for (String result : results) {
+            System.out.println(result);
+        }
+        generateHtmlReport(results, "audit_report.html");
     }
 
     public static void collectXmlFiles(File dir, List<File> xmlFiles) {
@@ -136,7 +143,6 @@ public class CodeAuditMain {
         }
     }
 
-    //找注入的实现
     public static void scanMyBatisXML(File xmlFile, Map<String, String> namespaceToPathMap, Map<String, List<VulnerabilityDetail>> namespaceToVulnerabilitiesMap) throws Exception {
         XMLInputFactory factory = XMLInputFactory.newInstance();
         XMLStreamReader reader = factory.createXMLStreamReader(new FileInputStream(xmlFile));
@@ -159,7 +165,6 @@ public class CodeAuditMain {
                     int lineNumber = reader.getLocation().getLineNumber();
 
                     if (sql.contains("${")) {
-                        //System.out.printf("%s 的 %s 方法存在注入，在第 %d 行%n", xmlFile.getName(), id, lineNumber);
                         if (namespace != null) {
                             namespaceToVulnerabilitiesMap.get(namespace).add(new VulnerabilityDetail(xmlFile.getName(), id, lineNumber));
                         }
@@ -291,7 +296,7 @@ public class CodeAuditMain {
                                             interfaceToVulnerabilitiesMap.forEach((interfaceName, vulnerabilities) -> {
                                                 vulnerabilities.forEach(vulnerability -> {
                                                     if (calledInterfaceName != null && vulnerability.methodName.equals(methodCall.getNameAsString())) {
-                                                        vulnerability.addControllerCall(String.format("%s 类的 %s 方法调用了接口 %s 的 %s 方法，在第 %d 行%n",
+                                                        vulnerability.addControllerCall(String.format("%s 类的 %s 方法调用了接口 %s 的 %s 方法，在第 %d 行",
                                                                 controllerClassName, method.getNameAsString(), interfaceName, methodCall.getNameAsString(), methodCall.getBegin().get().line));
                                                     }
                                                 });
@@ -308,4 +313,52 @@ public class CodeAuditMain {
             }
         }
     }
+
+    public static void generateHtmlReport(List<String> results, String filePath) {
+        try (PrintWriter writer = new PrintWriter(new FileWriter(filePath))) {
+            writer.println("<html>");
+            writer.println("<head>");
+            writer.println("<title>Code Audit Report</title>");
+            writer.println("<style>");
+            writer.println("body { font-family: Arial, sans-serif; margin: 40px; }");
+            writer.println("h1 { text-align: center; color: #333; }");
+            writer.println(".container { margin-bottom: 20px; }");
+            writer.println(".title { font-size: 18px; font-weight: bold; cursor: pointer; padding: 10px; background: #eee; border: 1px solid #ddd; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }");
+            writer.println(".content { display: none; padding: 10px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 4px 4px; }");
+            writer.println(".content p { margin: 0; }");
+            writer.println(".arrow { font-size: 12px; margin-left: 10px; }");
+            writer.println("</style>");
+            writer.println("</head>");
+            writer.println("<body>");
+            writer.println("<h1>Code Audit Report</h1>");
+            for (int i = 0; i < results.size(); i++) {
+                writer.println("<div class='container'>");
+                writer.printf("<div class='title'>SQL注入 %d <span class='arrow'>&#9654;</span></div>%n", i + 1);
+                writer.println("<div class='content'>");
+                writer.printf("<p>%s</p>%n", results.get(i));
+                writer.println("</div>");
+                writer.println("</div>");
+            }
+            writer.println("<script>");
+            writer.println("document.querySelectorAll('.title').forEach(title => {");
+            writer.println("    title.addEventListener('click', () => {");
+            writer.println("        const content = title.nextElementSibling;");
+            writer.println("        const arrow = title.querySelector('.arrow');");
+            writer.println("        if (content.style.display === 'block') {");
+            writer.println("            content.style.display = 'none';");
+            writer.println("            arrow.innerHTML = '&#9654;';"); // 向右箭头
+            writer.println("        } else {");
+            writer.println("            content.style.display = 'block';");
+            writer.println("            arrow.innerHTML = '&#9660;';"); // 向下箭头
+            writer.println("        }");
+            writer.println("    });");
+            writer.println("});");
+            writer.println("</script>");
+            writer.println("</body>");
+            writer.println("</html>");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
 }
