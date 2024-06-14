@@ -1,34 +1,3 @@
-package org.fupo.javaeasyscan;
-
-import com.github.javaparser.JavaParser;
-import com.github.javaparser.ParseProblemException;
-import com.github.javaparser.ParserConfiguration;
-import com.github.javaparser.ast.CompilationUnit;
-import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
-import com.github.javaparser.ast.body.MethodDeclaration;
-import com.github.javaparser.ast.body.VariableDeclarator;
-import com.github.javaparser.ast.expr.*;
-import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
-import com.github.javaparser.symbolsolver.JavaSymbolSolver;
-import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
-import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeSolver;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-/**
- * @Describe
- * @Author novy
- * @Version 1.0
- * @CreateDate 20:02 2024/6/14
- **/
 public class ExecScanner {
 
     public static void main(String[] args) {
@@ -133,31 +102,13 @@ public class ExecScanner {
         public void visit(MethodCallExpr methodCall, String filePath) {
             if (methodCall.getNameAsString().equals("exec")) {
                 int lineNumber = methodCall.getBegin().isPresent() ? methodCall.getBegin().get().line : -1;
-                System.out.println("Found 'exec' method call in file: " + filePath + " at line " + lineNumber);
-                System.out.println("Inside method: " + currentMethodName + " of class: " + currentClassName);
-                methodCall.getScope().ifPresent(scope -> {
-                    String scopeStr = scope.toString();
-                    if (variableDeclarations.containsKey(scopeStr)) {
-                        System.out.println("Method call scope: " + variableDeclarations.get(scopeStr));
-                    } else {
-                        System.out.println("Method call scope: " + scopeStr);
-                    }
-                });
+                System.out.println("找到了包含有exec方法的类: " + filePath + " at line " + lineNumber);
+                System.out.println("它所属的方法是： " + currentMethodName + "方法，这个" + currentMethodName + "方法属于: " + currentClassName + "类");
             } else if (methodCall.getNameAsString().equals("start")) {
                 if (isProcessBuilderStartMethod(methodCall)) {
                     int lineNumber = methodCall.getBegin().isPresent() ? methodCall.getBegin().get().line : -1;
-                    System.out.println("Found 'start' method call in file: " + filePath + " at line " + lineNumber);
-                    System.out.println("Inside method: " + currentMethodName + " of class: " + currentClassName);
-                    methodCall.getScope().ifPresent(scope -> {
-                        String scopeStr = scope.toString();
-                        if (variableDeclarations.containsKey(scopeStr) && variableDeclarations.get(scopeStr).equals("new ProcessBuilder()")) {
-                            System.out.println("Method call scope: ProcessBuilder");
-                        } else if (scopeStr.equals("new ProcessBuilder()")) {
-                            System.out.println("Method call scope: ProcessBuilder");
-                        } else {
-                            System.out.println("Method call scope: " + scopeStr);
-                        }
-                    });
+                    System.out.println("找到了包含有start方法的类: " + filePath + " at line " + lineNumber);
+                    System.out.println("这个代码所属的方法是： " + currentMethodName + "，这个" + currentMethodName + "方法属于: " + currentClassName + "类");
                 }
             }
             super.visit(methodCall, filePath);
