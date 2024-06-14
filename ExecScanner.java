@@ -167,7 +167,7 @@ public class ExecScanner {
             for (File javaFile : javaFiles) {
                 try {
                     CompilationUnit cu = javaParser.parse(javaFile).getResult().get();
-                    new UsageVisitor(className, methodName).visit(cu, javaFile.getAbsolutePath());
+                    new UsageVisitor(className, methodName, javaFiles, javaParser, visitedMethods).visit(cu, javaFile.getAbsolutePath());
                 } catch (IOException e) {
                     System.err.println("Failed to parse file: " + javaFile.getAbsolutePath());
                     e.printStackTrace();
@@ -178,16 +178,23 @@ public class ExecScanner {
         private static class UsageVisitor extends VoidVisitorAdapter<String> {
             private final String className;
             private final String methodName;
+            private final List<File> javaFiles;
+            private final JavaParser javaParser;
+            private final Set<String> visitedMethods;
+            private String currentMethodName = "";
+            private String currentClassName = "";
 
-
-            public UsageVisitor(String className, String methodName) {
+            public UsageVisitor(String className, String methodName, List<File> javaFiles, JavaParser javaParser, Set<String> visitedMethods) {
                 this.className = className;
                 this.methodName = methodName;
-
+                this.javaFiles = javaFiles;
+                this.javaParser = javaParser;
+                this.visitedMethods = visitedMethods;
             }
 
             @Override
             public void visit(ClassOrInterfaceDeclaration classOrInterface, String filePath) {
+                currentClassName = classOrInterface.getNameAsString();
                 super.visit(classOrInterface, filePath);
                 String fileClassName = classOrInterface.getNameAsString();
                 classOrInterface.findAll(MethodCallExpr.class).forEach(methodCall -> {
@@ -195,8 +202,19 @@ public class ExecScanner {
                         int lineNumber = methodCall.getBegin().isPresent() ? methodCall.getBegin().get().line : -1;
                         String callingMethodName = getContainingMethodName(methodCall);
                         System.out.println("具体调用信息：\n" + filePath + " 第" + lineNumber + "行中 " + fileClassName + "类的" + callingMethodName + "方法调用到了 " + className + "." + methodName + "\n");
+                        String calledMethod = fileClassName + "." + methodCall.getNameAsString();
+                        if (!visitedMethods.contains(calledMethod)) {
+                            visitedMethods.add(calledMethod);
+                            findUsages(fileClassName, callingMethodName, javaFiles, javaParser, visitedMethods);
+                        }
                     }
                 });
+            }
+
+            @Override
+            public void visit(MethodDeclaration methodDeclaration, String filePath) {
+                currentMethodName = methodDeclaration.getNameAsString();
+                super.visit(methodDeclaration, filePath);
             }
 
             private String getContainingMethodName(MethodCallExpr methodCall) {
@@ -205,6 +223,17 @@ public class ExecScanner {
                         .orElse("Unknown Method");
             }
 
+            private void findUsages(String className, String methodName, List<File> javaFiles, JavaParser javaParser, Set<String> visitedMethods) {
+                for (File javaFile : javaFiles) {
+                    try {
+                        CompilationUnit cu = javaParser.parse(javaFile).getResult().get();
+                        new UsageVisitor(className, methodName, javaFiles, javaParser, visitedMethods).visit(cu, javaFile.getAbsolutePath());
+                    } catch (IOException e) {
+                        System.err.println("Failed to parse file: " + javaFile.getAbsolutePath());
+                        e.printStackTrace();
+                    }
+                }
+            }
         }
     }
 }
