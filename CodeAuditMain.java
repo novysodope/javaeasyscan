@@ -1,5 +1,20 @@
 package org.fupo.javaeasyscan;
 
+import com.github.javaparser.ParserConfiguration;
+import com.github.javaparser.StaticJavaParser;
+import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.expr.MethodCallExpr;
+import com.github.javaparser.ast.expr.NameExpr;
+import com.github.javaparser.ast.type.ClassOrInterfaceType;
+import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
+import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
+import com.github.javaparser.symbolsolver.JavaSymbolSolver;
+import com.github.javaparser.symbolsolver.model.resolution.TypeSolver;
+import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
+import com.github.javaparser.symbolsolver.resolution.typesolvers.JavaParserTypeSolver;
+import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeSolver;
+
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamException;
@@ -44,6 +59,9 @@ public class CodeAuditMain {
             List<String> vulnerableMethods = namespaceToVulnerableMethodsMap.get(namespace);
             findMapperInterface(namespace, xmlFilePath, javaFiles, vulnerableMethods);
         }
+
+        // 查找所有包含implements的类并查找调用Mapper方法的地方
+        findImplementationsAndMethodCalls(namespaceToVulnerableMethodsMap, javaFiles);
     }
 
     // 递归扫描目录，收集所有MyBatis XML文件
@@ -148,6 +166,59 @@ public class CodeAuditMain {
                     }
                 }
                 break; // 找到匹配的接口文件后退出循环
+            }
+        }
+    }
+
+    // 查找所有包含implements的类并查找调用Mapper方法的地方
+    public static void findImplementationsAndMethodCalls(Map<String, List<String>> namespaceToVulnerableMethodsMap, List<File> javaFiles) {
+        for (File javaFile : javaFiles) {
+            try {
+                CompilationUnit cu = StaticJavaParser.parse(javaFile);
+                cu.accept(new VoidVisitorAdapter<Void>() {
+                    @Override
+                    public void visit(ClassOrInterfaceDeclaration classOrInterface, Void arg) {
+                        super.visit(classOrInterface, arg);
+                        if (!classOrInterface.isInterface() && classOrInterface.getImplementedTypes().size() > 0) {
+                            String className = classOrInterface.getNameAsString();
+                            //className是所有实现类
+//                            System.out.println(className);
+                            // 查找实现类中的方法调用
+                            classOrInterface.getMethods().forEach(method -> {
+                                method.accept(new VoidVisitorAdapter<Void>() {
+                                    @Override
+                                    public void visit(MethodCallExpr methodCall, Void arg) {
+//                                        method是所有实现类里的方法
+//                                        System.out.println(method);
+                                        super.visit(methodCall, arg);
+//                                        methodCall是列出了所有的方法调用，不仅限于mapper
+//                                        System.out.println(methodCall);
+                                        methodCall.getScope().ifPresent(scope -> {
+                                            String scopeName = scope.toString();
+                                            //scopeName是所有mapper
+                                            //System.out.println(scopeName);
+                                            namespaceToVulnerableMethodsMap.forEach((namespace, vulnerableMethods) -> {
+                                                String mapperInterfaceName = namespace.substring(namespace.lastIndexOf('.') + 1);
+//                                                System.out.println(mapperInterfaceName);
+//                                                mapperInterfaceName是所有mapper
+//                                                System.out.println(vulnerableMethods);
+//                                                vulnerableMethods是漏洞方法名
+//                                                System.out.println(methodCall.getNameAsString());
+//                                                methodCall.getNameAsString()是获取所有方法名
+                                                if (mapperInterfaceName != null && vulnerableMethods.contains(methodCall.getNameAsString())) {
+                                                    System.out.printf("%s 类调用了 %s 的 %s 方法，在 %d 行%n",
+                                                            className, mapperInterfaceName, methodCall.getNameAsString(), methodCall.getBegin().get().line);
+                                                }
+                                            });
+                                        });
+                                    }
+                                }, null);
+                            });
+                        }
+                    }
+                }, null);
+            } catch (Exception e) {
+                e.printStackTrace();
             }
         }
     }
