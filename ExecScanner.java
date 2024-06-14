@@ -133,18 +133,28 @@ public class ExecScanner {
                     }
                 });
             } else if (methodCall.getNameAsString().equals("start")) {
-                int lineNumber = methodCall.getBegin().isPresent() ? methodCall.getBegin().get().line : -1;
-                System.out.println("Found 'start' method call in file: " + filePath + " at line " + lineNumber);
-                methodCall.getScope().ifPresent(scope -> {
-                    String scopeStr = scope.toString();
-                    if (variableDeclarations.containsKey(scopeStr) && variableDeclarations.get(scopeStr).equals("new ProcessBuilder()")) {
-                        System.out.println("Method call scope: ProcessBuilder");
-                    } else if (scopeStr.equals("new ProcessBuilder()")) {
-                        System.out.println("Method call scope: ProcessBuilder");
-                    } else {
-                        System.out.println("Method call scope: " + scopeStr);
-                    }
-                });
+                if (isProcessBuilderStartMethod(methodCall)) {
+                    int lineNumber = methodCall.getBegin().isPresent() ? methodCall.getBegin().get().line : -1;
+                    System.out.println("Found 'start' method call in file: " + filePath + " at line " + lineNumber);
+                    methodCall.getScope().ifPresent(scope -> {
+                        String scopeStr = scope.toString();
+                        if (variableDeclarations.containsKey(scopeStr) && variableDeclarations.get(scopeStr).equals("new ProcessBuilder()")) {
+                            System.out.println("Method call scope: ProcessBuilder");
+                        } else if (scopeStr.equals("new ProcessBuilder()")) {
+                            System.out.println("Method call scope: ProcessBuilder");
+                        } else {
+                            System.out.println("Method call scope: " + scopeStr);
+                        }
+                    });
+                }
+            }
+        }
+
+        private boolean isProcessBuilderStartMethod(MethodCallExpr methodCall) {
+            try {
+                return methodCall.resolve().getQualifiedSignature().contains("java.lang.ProcessBuilder.start");
+            } catch (Exception e) {
+                return false;
             }
         }
     }
