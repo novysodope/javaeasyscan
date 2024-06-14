@@ -55,7 +55,7 @@ public class ExecScanner {
         for (File javaFile : javaFiles) {
             try {
                 CompilationUnit cu = javaParser.parse(javaFile).getResult().get();
-                MethodCallVisitor methodCallVisitor = new MethodCallVisitor();
+                MethodCallVisitor methodCallVisitor = new MethodCallVisitor(javaFiles, javaParser);
                 methodCallVisitor.visit(cu, javaFile.getAbsolutePath());
             } catch (IOException e) {
                 System.err.println("Failed to parse file: " + javaFile.getAbsolutePath());
@@ -82,6 +82,13 @@ public class ExecScanner {
         private final Map<String, String> variableDeclarations = new HashMap<>();
         private String currentMethodName = "";
         private String currentClassName = "";
+        private final List<File> javaFiles;
+        private final JavaParser javaParser;
+
+        public MethodCallVisitor(List<File> javaFiles, JavaParser javaParser) {
+            this.javaFiles = javaFiles;
+            this.javaParser = javaParser;
+        }
 
         @Override
         public void visit(ClassOrInterfaceDeclaration classOrInterface, String filePath) {
@@ -136,13 +143,14 @@ public class ExecScanner {
         public void visit(MethodCallExpr methodCall, String filePath) {
             if (methodCall.getNameAsString().equals("exec")) {
                 int lineNumber = methodCall.getBegin().isPresent() ? methodCall.getBegin().get().line : -1;
-                System.out.println("找到了包含有exec方法的类: " + filePath + " at line " + lineNumber);
-                System.out.println("它所属的方法是： " + currentMethodName + "方法，这个" + currentMethodName + "方法属于: " + currentClassName + "类");
+              //  System.out.println(filePath + " at line " + lineNumber);
+                System.out.println(currentClassName + "类存在exec命令执行，在" + currentMethodName + "方法中，第" + lineNumber + "行");
+                findUsages(currentClassName, currentMethodName, javaFiles, javaParser);
             } else if (methodCall.getNameAsString().equals("start")) {
                 if (isProcessBuilderStartMethod(methodCall)) {
                     int lineNumber = methodCall.getBegin().isPresent() ? methodCall.getBegin().get().line : -1;
-                    System.out.println("找到了包含有start方法的类: " + filePath + " at line " + lineNumber);
-                    System.out.println("这个代码所属的方法是： " + currentMethodName + "，这个" + currentMethodName + "方法属于: " + currentClassName + "类");
+                    System.out.println(currentClassName + "类存在ProcessBuilder命令执行，在" + currentMethodName + "方法中，第" + lineNumber + "行");
+                    findUsages(currentClassName, currentMethodName, javaFiles, javaParser);
                 }
             }
             super.visit(methodCall, filePath);
@@ -153,6 +161,37 @@ public class ExecScanner {
                 return methodCall.resolve().getQualifiedSignature().contains("java.lang.ProcessBuilder.start");
             } catch (Exception e) {
                 return false;
+            }
+        }
+
+        private void findUsages(String className, String methodName, List<File> javaFiles, JavaParser javaParser) {
+            for (File javaFile : javaFiles) {
+                try {
+                    CompilationUnit cu = javaParser.parse(javaFile).getResult().get();
+                    new UsageVisitor(className, methodName).visit(cu, javaFile.getAbsolutePath());
+                } catch (IOException e) {
+                    System.err.println("Failed to parse file: " + javaFile.getAbsolutePath());
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        private static class UsageVisitor extends VoidVisitorAdapter<String> {
+            private final String className;
+            private final String methodName;
+
+            public UsageVisitor(String className, String methodName) {
+                this.className = className;
+                this.methodName = methodName;
+            }
+
+            @Override
+            public void visit(MethodCallExpr methodCall, String filePath) {
+                super.visit(methodCall, filePath);
+                if (methodCall.getScope().isPresent() && methodCall.getScope().get().toString().toLowerCase().contains(className.toLowerCase()) && methodCall.getNameAsString().contains(methodName)) {
+                    int lineNumber = methodCall.getBegin().isPresent() ? methodCall.getBegin().get().line : -1;
+                    System.out.println("具体调用信息：\n" + filePath + " 第" + lineNumber + "行中，调用到了"  + className + "." + methodName + "\n");
+                }
             }
         }
     }
