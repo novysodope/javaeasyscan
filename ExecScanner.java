@@ -144,12 +144,12 @@ public class ExecScanner {
             if (methodCall.getNameAsString().equals("exec")) {
                 int lineNumber = methodCall.getBegin().isPresent() ? methodCall.getBegin().get().line : -1;
                 System.out.println(currentClassName + "类存在exec命令执行，在" + currentMethodName + "方法中，第" + lineNumber + "行");
-                findUsages(currentClassName, currentMethodName, javaFiles, javaParser);
+                findUsages(currentClassName, currentMethodName, javaFiles, javaParser, new HashSet<>());
             } else if (methodCall.getNameAsString().equals("start")) {
                 if (isProcessBuilderStartMethod(methodCall)) {
                     int lineNumber = methodCall.getBegin().isPresent() ? methodCall.getBegin().get().line : -1;
                     System.out.println(currentClassName + "类存在ProcessBuilder命令执行，在" + currentMethodName + "方法中，第" + lineNumber + "行");
-                    findUsages(currentClassName, currentMethodName, javaFiles, javaParser);
+                    findUsages(currentClassName, currentMethodName, javaFiles, javaParser, new HashSet<>());
                 }
             }
             super.visit(methodCall, filePath);
@@ -163,7 +163,7 @@ public class ExecScanner {
             }
         }
 
-        private void findUsages(String className, String methodName, List<File> javaFiles, JavaParser javaParser) {
+        private void findUsages(String className, String methodName, List<File> javaFiles, JavaParser javaParser, Set<String> visitedMethods) {
             for (File javaFile : javaFiles) {
                 try {
                     CompilationUnit cu = javaParser.parse(javaFile).getResult().get();
@@ -179,9 +179,11 @@ public class ExecScanner {
             private final String className;
             private final String methodName;
 
+
             public UsageVisitor(String className, String methodName) {
                 this.className = className;
                 this.methodName = methodName;
+
             }
 
             @Override
@@ -191,10 +193,18 @@ public class ExecScanner {
                 classOrInterface.findAll(MethodCallExpr.class).forEach(methodCall -> {
                     if (methodCall.getScope().isPresent() && methodCall.getScope().get().toString().toLowerCase().contains(className.toLowerCase()) && methodCall.getNameAsString().contains(methodName)) {
                         int lineNumber = methodCall.getBegin().isPresent() ? methodCall.getBegin().get().line : -1;
-                        System.out.println("具体调用信息：\n" + filePath + " " + fileClassName + "类第" + lineNumber + "行中，调用到了 " + className + "." + methodName + "\n");
+                        String callingMethodName = getContainingMethodName(methodCall);
+                        System.out.println("具体调用信息：\n" + filePath + " 第" + lineNumber + "行中 " + fileClassName + "类的" + callingMethodName + "方法调用到了 " + className + "." + methodName + "\n");
                     }
                 });
             }
+
+            private String getContainingMethodName(MethodCallExpr methodCall) {
+                return methodCall.findAncestor(MethodDeclaration.class)
+                        .map(MethodDeclaration::getNameAsString)
+                        .orElse("Unknown Method");
+            }
+
         }
     }
 }
