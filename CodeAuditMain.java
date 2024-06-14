@@ -30,20 +30,23 @@ import java.util.*;
  * @Version 1.0
  * @CreateDate 2024/6/13 14:53
  **/
+
 public class SQLInjectScan {
 
-    //优化输出，显示完整的调用链
+    // 优化输出，显示完整的调用链
     static class VulnerabilityDetail {
         String xmlFile;
         String methodName;
         int xmlLineNumber;
+        String vulnerableLineContent;
         List<String> implCalls;
         List<String> controllerCalls;
 
-        VulnerabilityDetail(String xmlFile, String methodName, int xmlLineNumber) {
+        VulnerabilityDetail(String xmlFile, String methodName, int xmlLineNumber, String vulnerableLineContent) {
             this.xmlFile = xmlFile;
             this.methodName = methodName;
             this.xmlLineNumber = xmlLineNumber;
+            this.vulnerableLineContent = vulnerableLineContent;
             this.implCalls = new ArrayList<>();
             this.controllerCalls = new ArrayList<>();
         }
@@ -58,13 +61,13 @@ public class SQLInjectScan {
 
         List<String> getFormattedOutput() {
             List<String> outputs = new ArrayList<>();
-            String base = String.format("%s 的 %s 方法存在注入，在第 %d 行", xmlFile, methodName, xmlLineNumber);
+            String base = String.format("%s 的 %s 方法存在注入，在第 %d 行：%n%s%n", xmlFile, methodName, xmlLineNumber, vulnerableLineContent);
 
             if (implCalls.isEmpty() && controllerCalls.isEmpty()) {
                 outputs.add(base);
             } else {
                 for (String implCall : implCalls) {
-                    String implChain = base + "，" + implCall;
+                    String implChain = base  + implCall;
                     if (controllerCalls.isEmpty()) {
                         outputs.add(implChain);
                     } else {
@@ -84,7 +87,7 @@ public class SQLInjectScan {
         List<File> xmlFiles = new ArrayList<>();
         collectXmlFiles(rootDir, xmlFiles);
 
-        //用来存储解析到的Mapper接口名和他的文件路径，方便后续去查找对应的调用
+        // 用来存储解析到的Mapper接口名和他的文件路径，方便后续去查找对应的调用
         Map<String, String> namespaceToPathMap = new HashMap<>();
         Map<String, List<VulnerabilityDetail>> namespaceToVulnerabilitiesMap = new HashMap<>();
 
@@ -94,7 +97,7 @@ public class SQLInjectScan {
 
         List<File> javaFiles = new ArrayList<>();
 
-        //确认Mapper接口文件中存在XML文件里存在漏洞的方法，这个操作是确保这个方法出现在整个数据库操作流程中（保证他被用到），减少误报
+        // 确认Mapper接口文件中存在XML文件里存在漏洞的方法，这个操作是确保这个方法出现在整个数据库操作流程中（保证他被用到），减少误报
         collectJavaFiles(rootDir, javaFiles);
         for (Map.Entry<String, String> entry : namespaceToPathMap.entrySet()) {
             String namespace = entry.getKey();
@@ -149,6 +152,7 @@ public class SQLInjectScan {
         XMLStreamReader reader = factory.createXMLStreamReader(new FileInputStream(xmlFile));
 
         String namespace = null;
+        int currentLine = 0;
 
         while (reader.hasNext()) {
             int event = reader.next();
@@ -163,11 +167,11 @@ public class SQLInjectScan {
                 } else if (Arrays.asList("select", "insert", "update", "delete").contains(elementName)) {
                     String id = reader.getAttributeValue(null, "id");
                     String sql = getElementText(reader);
-                    int lineNumber = reader.getLocation().getLineNumber();
+                    currentLine = reader.getLocation().getLineNumber();
 
                     if (sql.contains("${")) {
                         if (namespace != null) {
-                            namespaceToVulnerabilitiesMap.get(namespace).add(new VulnerabilityDetail(xmlFile.getName(), id, lineNumber));
+                            namespaceToVulnerabilitiesMap.get(namespace).add(new VulnerabilityDetail(xmlFile.getName(), id, currentLine, sql.trim()));
                         }
                     }
                 }
@@ -214,7 +218,7 @@ public class SQLInjectScan {
         }
     }
 
-    //查找所有实现类，并且找到调用了上面有漏洞的Mapper方法的地方
+    // 查找所有实现类，并且找到调用了上面有漏洞的Mapper方法的地方
     public static Map<String, List<VulnerabilityDetail>> findImplementationsAndMethodCalls(Map<String, List<VulnerabilityDetail>> namespaceToVulnerabilitiesMap, List<File> javaFiles) {
         Map<String, List<VulnerabilityDetail>> interfaceToVulnerabilitiesMap = new HashMap<>();
 
@@ -227,7 +231,7 @@ public class SQLInjectScan {
                         super.visit(classOrInterface, arg);
                         if (!classOrInterface.isInterface() && classOrInterface.getImplementedTypes().size() > 0) {
                             String className = classOrInterface.getNameAsString();
-                            //这个implementedInterfaces后续会用到，因为最终控制层调用的就是接口的方法，所以这里要先找到实现类实现的接口，以方便后续的调用查找
+                            // 这个implementedInterfaces后续会用到，因为最终控制层调用的就是接口的方法，所以这里要先找到实现类实现的接口，以方便后续的调用查找
                             List<String> implementedInterfaces = new ArrayList<>();
                             classOrInterface.getImplementedTypes().forEach(implementedType -> {
                                 implementedInterfaces.add(implementedType.getNameAsString());
@@ -270,7 +274,7 @@ public class SQLInjectScan {
         return interfaceToVulnerabilitiesMap;
     }
 
-    //参考的springboot/mvc项目，基于注解来找控制层，在控制层里找接口
+    // 参考的springboot/mvc项目，基于注解来找控制层，在控制层里找接口
     public static void findRequestMappingCalls(Map<String, List<VulnerabilityDetail>> interfaceToVulnerabilitiesMap, List<File> javaFiles) {
         for (File javaFile : javaFiles) {
             try {
@@ -326,7 +330,7 @@ public class SQLInjectScan {
             writer.println(".container { margin-bottom: 20px; }");
             writer.println(".title { font-size: 18px; font-weight: bold; cursor: pointer; padding: 10px; background: #eee; border: 1px solid #ddd; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }");
             writer.println(".content { display: none; padding: 10px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 4px 4px; }");
-            writer.println(".content p { margin: 0; }");
+            writer.println(".content p { margin: 0; white-space: pre-wrap; }");
             writer.println(".arrow { font-size: 12px; margin-left: 10px; }");
             writer.println("</style>");
             writer.println("</head>");
@@ -336,7 +340,7 @@ public class SQLInjectScan {
                 writer.println("<div class='container'>");
                 writer.printf("<div class='title'>SQL注入 %d <span class='arrow'>&#9654;</span></div>%n", i + 1);
                 writer.println("<div class='content'>");
-                writer.printf("<p>%s</p>%n", results.get(i).replace("\n","<br>"));
+                writer.printf("<p>%s</p>%n", results.get(i).replace("\n", "<br>"));
                 writer.println("</div>");
                 writer.println("</div>");
             }
@@ -361,5 +365,5 @@ public class SQLInjectScan {
             e.printStackTrace();
         }
     }
-
 }
+
