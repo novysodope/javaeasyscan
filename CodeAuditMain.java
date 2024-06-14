@@ -25,11 +25,12 @@ import java.nio.file.Paths;
 import java.util.*;
 
 /**
- * @author novy
- * @version 1.0
- * @createDate 2024/6/13 14:53
+ * @Describe Fupo JavaEasyScan for springboot/springmvc
+ * @Author novy
+ * @Version 1.0
+ * @CreateDate 2024/6/13 14:53
  **/
-public class CodeAuditMain {
+public class SQLInjectScan {
 
     //优化输出，显示完整的调用链
     static class VulnerabilityDetail {
@@ -245,8 +246,8 @@ public class CodeAuditMain {
                                                             .filter(v -> v.methodName.equals(methodCall.getNameAsString()))
                                                             .findFirst().orElse(null);
                                                     if (vulnerability != null) {
-                                                        vulnerability.addImplCall(String.format("%s 类实现了接口 %s , 调用了 %s 的 %s 方法，在第 %d 行",
-                                                                className, String.join(", ", implementedInterfaces), mapperInterfaceName, methodCall.getNameAsString(), methodCall.getBegin().get().line));
+                                                        vulnerability.addImplCall(String.format("调用信息如下:%n%s 类实现了接口 %s , 调用了 %s 的 %s 方法",
+                                                                className, String.join(", ", implementedInterfaces), mapperInterfaceName, methodCall.getNameAsString()));
                                                         implementedInterfaces.forEach(interfaceName -> {
                                                             interfaceToVulnerabilitiesMap.putIfAbsent(interfaceName, new ArrayList<>());
                                                             interfaceToVulnerabilitiesMap.get(interfaceName).add(vulnerability);
@@ -296,7 +297,7 @@ public class CodeAuditMain {
                                             interfaceToVulnerabilitiesMap.forEach((interfaceName, vulnerabilities) -> {
                                                 vulnerabilities.forEach(vulnerability -> {
                                                     if (calledInterfaceName != null && vulnerability.methodName.equals(methodCall.getNameAsString())) {
-                                                        vulnerability.addControllerCall(String.format("%s 类的 %s 方法调用了接口 %s 的 %s 方法，在第 %d 行",
+                                                        vulnerability.addControllerCall(String.format("%s 类的 %s 方法调用了接口 %s 的 %s 方法，在第 %d 行%n",
                                                                 controllerClassName, method.getNameAsString(), interfaceName, methodCall.getNameAsString(), methodCall.getBegin().get().line));
                                                     }
                                                 });
@@ -318,7 +319,7 @@ public class CodeAuditMain {
         try (PrintWriter writer = new PrintWriter(new FileWriter(filePath))) {
             writer.println("<html>");
             writer.println("<head>");
-            writer.println("<title>Code Audit Report</title>");
+            writer.println("<title>Fupo JavaEasyScan Result</title>");
             writer.println("<style>");
             writer.println("body { font-family: Arial, sans-serif; margin: 40px; }");
             writer.println("h1 { text-align: center; color: #333; }");
@@ -330,12 +331,12 @@ public class CodeAuditMain {
             writer.println("</style>");
             writer.println("</head>");
             writer.println("<body>");
-            writer.println("<h1>Code Audit Report</h1>");
+            writer.println("<h1>Fupo JavaEasyScan CodeAudit Report</h1>");
             for (int i = 0; i < results.size(); i++) {
                 writer.println("<div class='container'>");
                 writer.printf("<div class='title'>SQL注入 %d <span class='arrow'>&#9654;</span></div>%n", i + 1);
                 writer.println("<div class='content'>");
-                writer.printf("<p>%s</p>%n", results.get(i));
+                writer.printf("<p>%s</p>%n", results.get(i).replace("\n","<br>"));
                 writer.println("</div>");
                 writer.println("</div>");
             }
@@ -346,10 +347,10 @@ public class CodeAuditMain {
             writer.println("        const arrow = title.querySelector('.arrow');");
             writer.println("        if (content.style.display === 'block') {");
             writer.println("            content.style.display = 'none';");
-            writer.println("            arrow.innerHTML = '&#9654;';"); // 向右箭头
+            writer.println("            arrow.innerHTML = '&#9654;';");
             writer.println("        } else {");
             writer.println("            content.style.display = 'block';");
-            writer.println("            arrow.innerHTML = '&#9660;';"); // 向下箭头
+            writer.println("            arrow.innerHTML = '&#9660;';");
             writer.println("        }");
             writer.println("    });");
             writer.println("});");
