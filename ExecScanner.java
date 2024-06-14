@@ -4,6 +4,7 @@ import com.github.javaparser.JavaParser;
 import com.github.javaparser.ParseProblemException;
 import com.github.javaparser.ParserConfiguration;
 import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
@@ -30,11 +31,6 @@ import java.util.Map;
 public class ExecScanner {
 
     public static void main(String[] args) {
-        if (args.length == 0) {
-            System.err.println("Please provide the directory path containing Java files.");
-            return;
-        }
-
         File rootDir = new File(args[0]);
         if (!rootDir.isDirectory()) {
             System.err.println("Provided path is not a directory.");
@@ -80,6 +76,13 @@ public class ExecScanner {
 
     private static class MethodCallVisitor extends VoidVisitorAdapter<String> {
         private final Map<String, String> variableDeclarations = new HashMap<>();
+        private String currentMethodName = "";
+
+        @Override
+        public void visit(MethodDeclaration methodDeclaration, String filePath) {
+            currentMethodName = methodDeclaration.getNameAsString();
+            super.visit(methodDeclaration, filePath);
+        }
 
         @Override
         public void visit(VariableDeclarator variableDeclarator, String filePath) {
@@ -120,10 +123,10 @@ public class ExecScanner {
 
         @Override
         public void visit(MethodCallExpr methodCall, String filePath) {
-            super.visit(methodCall, filePath);
             if (methodCall.getNameAsString().equals("exec")) {
                 int lineNumber = methodCall.getBegin().isPresent() ? methodCall.getBegin().get().line : -1;
                 System.out.println("Found 'exec' method call in file: " + filePath + " at line " + lineNumber);
+                System.out.println("这个代码属于方法： " + currentMethodName);
                 methodCall.getScope().ifPresent(scope -> {
                     String scopeStr = scope.toString();
                     if (variableDeclarations.containsKey(scopeStr)) {
@@ -136,6 +139,7 @@ public class ExecScanner {
                 if (isProcessBuilderStartMethod(methodCall)) {
                     int lineNumber = methodCall.getBegin().isPresent() ? methodCall.getBegin().get().line : -1;
                     System.out.println("Found 'start' method call in file: " + filePath + " at line " + lineNumber);
+                    System.out.println("这个代码属于方法: " + currentMethodName);
                     methodCall.getScope().ifPresent(scope -> {
                         String scopeStr = scope.toString();
                         if (variableDeclarations.containsKey(scopeStr) && variableDeclarations.get(scopeStr).equals("new ProcessBuilder()")) {
@@ -148,6 +152,7 @@ public class ExecScanner {
                     });
                 }
             }
+            super.visit(methodCall, filePath);
         }
 
         private boolean isProcessBuilderStartMethod(MethodCallExpr methodCall) {
