@@ -53,7 +53,8 @@ public class CodeAuditMain {
             findMapperInterface(namespace, xmlFilePath, javaFiles, vulnerableMethods);
         }
 
-        findImplementationsAndMethodCalls(namespaceToVulnerableMethodsMap, javaFiles);
+        Map<String, List<String>> interfaceToVulnerableMethodsMap = findImplementationsAndMethodCalls(namespaceToVulnerableMethodsMap, javaFiles);
+        findRequestMappingCalls(interfaceToVulnerableMethodsMap, javaFiles);
     }
 
     public static void collectXmlFiles(File dir, List<File> xmlFiles) {
@@ -79,7 +80,6 @@ public class CodeAuditMain {
             }
         }
     }
-
     //找注入的实现
     public static void scanMyBatisXML(File xmlFile, Map<String, String> namespaceToPathMap, Map<String, List<String>> namespaceToVulnerableMethodsMap) throws Exception {
         XMLInputFactory factory = XMLInputFactory.newInstance();
@@ -155,9 +155,10 @@ public class CodeAuditMain {
             }
         }
     }
-
     //查找所有实现类，并且找到调用了上面有漏洞的Mapper方法的地方
-    public static void findImplementationsAndMethodCalls(Map<String, List<String>> namespaceToVulnerableMethodsMap, List<File> javaFiles) {
+    public static Map<String, List<String>> findImplementationsAndMethodCalls(Map<String, List<String>> namespaceToVulnerableMethodsMap, List<File> javaFiles) {
+        Map<String, List<String>> interfaceToVulnerableMethodsMap = new HashMap<>();
+
         for (File javaFile : javaFiles) {
             try {
                 CompilationUnit cu = StaticJavaParser.parse(javaFile);
@@ -167,7 +168,7 @@ public class CodeAuditMain {
                         super.visit(classOrInterface, arg);
                         if (!classOrInterface.isInterface() && classOrInterface.getImplementedTypes().size() > 0) {
                             String className = classOrInterface.getNameAsString();
-                            //这个implementedInterfaces后续会用到，因为最终业务逻辑层调用的就是接口的方法，所以这里要先找到实现类实现的接口，以方便后续的调用查找
+                            //这个implementedInterfaces后续会用到，因为最终控制层调用的就是接口的方法，所以这里要先找到实现类实现的接口，以方便后续的调用查找
                             List<String> implementedInterfaces = new ArrayList<>();
                             classOrInterface.getImplementedTypes().forEach(implementedType -> {
                                 implementedInterfaces.add(implementedType.getNameAsString());
@@ -181,9 +182,58 @@ public class CodeAuditMain {
                                         methodCall.getScope().ifPresent(scope -> {
                                             namespaceToVulnerableMethodsMap.forEach((namespace, vulnerableMethods) -> {
                                                 String mapperInterfaceName = namespace.substring(namespace.lastIndexOf('.') + 1);
-                                                if (mapperInterfaceName!=null&& vulnerableMethods.contains(methodCall.getNameAsString())) {
+                                                if (mapperInterfaceName!=null && vulnerableMethods.contains(methodCall.getNameAsString())) {
                                                     System.out.printf("%s 类实现了接口 %s , 调用了 %s 的 %s 方法，在 %d 行%n",
-                                                            className,String.join(", ", implementedInterfaces), mapperInterfaceName, methodCall.getNameAsString(), methodCall.getBegin().get().line);
+                                                            className, String.join(", ", implementedInterfaces), mapperInterfaceName, methodCall.getNameAsString(), methodCall.getBegin().get().line);
+                                                    implementedInterfaces.forEach(interfaceName -> {
+                                                        interfaceToVulnerableMethodsMap.putIfAbsent(interfaceName, new ArrayList<>());
+                                                        interfaceToVulnerableMethodsMap.get(interfaceName).add(methodCall.getNameAsString());
+                                                    });
+                                                }
+                                            });
+                                        });
+                                    }
+                                }, null);
+                            });
+                        }
+                    }
+                }, null);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        return interfaceToVulnerableMethodsMap;
+    }
+
+    //参考的springboot/mvc项目，基于注解来找控制层，在控制层里找接口
+    public static void findRequestMappingCalls(Map<String, List<String>> interfaceToVulnerableMethodsMap, List<File> javaFiles) {
+        for (File javaFile : javaFiles) {
+            try {
+                CompilationUnit cu = StaticJavaParser.parse(javaFile);
+                cu.accept(new VoidVisitorAdapter<Void>() {
+                    @Override
+                    public void visit(ClassOrInterfaceDeclaration classOrInterface, Void arg) {
+                        super.visit(classOrInterface, arg);
+                        if (classOrInterface.getAnnotations().stream().anyMatch(annotation -> annotation.getNameAsString().equals("RequestMapping")
+                                || annotation.getNameAsString().equals("GetMapping")
+                                || annotation.getNameAsString().equals("PostMapping")
+                                || annotation.getNameAsString().equals("PutMapping")
+                                || annotation.getNameAsString().equals("DeleteMapping")
+                                || annotation.getNameAsString().equals("Controller"))) {
+                            String controllerClassName = classOrInterface.getNameAsString();
+
+                            classOrInterface.getMethods().forEach(method -> {
+                                method.accept(new VoidVisitorAdapter<Void>() {
+                                    @Override
+                                    public void visit(MethodCallExpr methodCall, Void arg) {
+                                        super.visit(methodCall, arg);
+                                        methodCall.getScope().ifPresent(scope -> {
+                                            String calledInterfaceName = scope.toString();
+                                            interfaceToVulnerableMethodsMap.forEach((interfaceName, vulnerableMethods) -> {
+                                                if (calledInterfaceName!=null && vulnerableMethods.contains(methodCall.getNameAsString())) {
+                                                    System.out.printf("%s 类的 %s 方法调用了接口 %s 的 %s 方法%n",
+                                                            controllerClassName, method.getNameAsString(), interfaceName, methodCall.getNameAsString());
                                                 }
                                             });
                                         });
