@@ -5,10 +5,7 @@ import com.github.javaparser.ParseProblemException;
 import com.github.javaparser.ParserConfiguration;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.VariableDeclarator;
-import com.github.javaparser.ast.expr.AssignExpr;
-import com.github.javaparser.ast.expr.Expression;
-import com.github.javaparser.ast.expr.MethodCallExpr;
-import com.github.javaparser.ast.expr.VariableDeclarationExpr;
+import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
 import com.github.javaparser.symbolsolver.JavaSymbolSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
@@ -94,6 +91,11 @@ public class ExecScanner {
                     if (methodCall.getNameAsString().equals("getRuntime") && methodCall.getScope().isPresent() && methodCall.getScope().get().toString().equals("Runtime")) {
                         variableDeclarations.put(variableDeclarator.getNameAsString(), "Runtime.getRuntime()");
                     }
+                } else if (initializer.isObjectCreationExpr()) {
+                    ObjectCreationExpr objectCreationExpr = initializer.asObjectCreationExpr();
+                    if (objectCreationExpr.getType().getNameAsString().equals("ProcessBuilder")) {
+                        variableDeclarations.put(variableDeclarator.getNameAsString(), "new ProcessBuilder()");
+                    }
                 }
             }
         }
@@ -106,6 +108,12 @@ public class ExecScanner {
                 MethodCallExpr methodCall = assignExpr.getValue().asMethodCallExpr();
                 if (methodCall.getNameAsString().equals("getRuntime") && methodCall.getScope().isPresent() && methodCall.getScope().get().toString().equals("Runtime")) {
                     variableDeclarations.put(variableName, "Runtime.getRuntime()");
+                }
+            } else if (assignExpr.getTarget().isNameExpr() && assignExpr.getValue().isObjectCreationExpr()) {
+                String variableName = assignExpr.getTarget().asNameExpr().getNameAsString();
+                ObjectCreationExpr objectCreationExpr = assignExpr.getValue().asObjectCreationExpr();
+                if (objectCreationExpr.getType().getNameAsString().equals("ProcessBuilder")) {
+                    variableDeclarations.put(variableName, "new ProcessBuilder()");
                 }
             }
         }
@@ -120,6 +128,19 @@ public class ExecScanner {
                     String scopeStr = scope.toString();
                     if (variableDeclarations.containsKey(scopeStr)) {
                         System.out.println("Method call scope: " + variableDeclarations.get(scopeStr));
+                    } else {
+                        System.out.println("Method call scope: " + scopeStr);
+                    }
+                });
+            } else if (methodCall.getNameAsString().equals("start")) {
+                int lineNumber = methodCall.getBegin().isPresent() ? methodCall.getBegin().get().line : -1;
+                System.out.println("Found 'start' method call in file: " + filePath + " at line " + lineNumber);
+                methodCall.getScope().ifPresent(scope -> {
+                    String scopeStr = scope.toString();
+                    if (variableDeclarations.containsKey(scopeStr) && variableDeclarations.get(scopeStr).equals("new ProcessBuilder()")) {
+                        System.out.println("Method call scope: ProcessBuilder");
+                    } else if (scopeStr.equals("new ProcessBuilder()")) {
+                        System.out.println("Method call scope: ProcessBuilder");
                     } else {
                         System.out.println("Method call scope: " + scopeStr);
                     }
