@@ -143,7 +143,6 @@ public class ExecScanner {
         public void visit(MethodCallExpr methodCall, String filePath) {
             if (methodCall.getNameAsString().equals("exec")) {
                 int lineNumber = methodCall.getBegin().isPresent() ? methodCall.getBegin().get().line : -1;
-              //  System.out.println(filePath + " at line " + lineNumber);
                 System.out.println(currentClassName + "类存在exec命令执行，在" + currentMethodName + "方法中，第" + lineNumber + "行");
                 findUsages(currentClassName, currentMethodName, javaFiles, javaParser);
             } else if (methodCall.getNameAsString().equals("start")) {
@@ -186,12 +185,15 @@ public class ExecScanner {
             }
 
             @Override
-            public void visit(MethodCallExpr methodCall, String filePath) {
-                super.visit(methodCall, filePath);
-                if (methodCall.getScope().isPresent() && methodCall.getScope().get().toString().toLowerCase().contains(className.toLowerCase()) && methodCall.getNameAsString().contains(methodName)) {
-                    int lineNumber = methodCall.getBegin().isPresent() ? methodCall.getBegin().get().line : -1;
-                    System.out.println("具体调用信息：\n" + filePath + " 第" + lineNumber + "行中，调用到了"  + className + "." + methodName + "\n");
-                }
+            public void visit(ClassOrInterfaceDeclaration classOrInterface, String filePath) {
+                super.visit(classOrInterface, filePath);
+                String fileClassName = classOrInterface.getNameAsString();
+                classOrInterface.findAll(MethodCallExpr.class).forEach(methodCall -> {
+                    if (methodCall.getScope().isPresent() && methodCall.getScope().get().toString().toLowerCase().contains(className.toLowerCase()) && methodCall.getNameAsString().contains(methodName)) {
+                        int lineNumber = methodCall.getBegin().isPresent() ? methodCall.getBegin().get().line : -1;
+                        System.out.println("具体调用信息：\n" + filePath + " " + fileClassName + "类第" + lineNumber + "行中，调用到了 " + className + "." + methodName + "\n");
+                    }
+                });
             }
         }
     }
