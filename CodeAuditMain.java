@@ -67,7 +67,7 @@ public class SQLInjectScan {
                 outputs.add(base);
             } else {
                 for (String implCall : implCalls) {
-                    String implChain = base  + implCall;
+                    String implChain = base + implCall;
                     if (controllerCalls.isEmpty()) {
                         outputs.add(implChain);
                     } else {
@@ -301,8 +301,9 @@ public class SQLInjectScan {
                                             interfaceToVulnerabilitiesMap.forEach((interfaceName, vulnerabilities) -> {
                                                 vulnerabilities.forEach(vulnerability -> {
                                                     if (calledInterfaceName != null && vulnerability.methodName.equals(methodCall.getNameAsString())) {
-                                                        vulnerability.addControllerCall(String.format("%s 类的 %s 方法调用了接口 %s 的 %s 方法，在第 %d 行%n",
-                                                                controllerClassName, method.getNameAsString(), interfaceName, methodCall.getNameAsString(), methodCall.getBegin().get().line));
+                                                        String vulnerableLineContent = getLineContent(javaFile, methodCall.getBegin().get().line - 1);
+                                                        vulnerability.addControllerCall(String.format("%s 类的 %s 方法调用了接口 %s 的 %s 方法，在第 %d 行：%n%s%n",
+                                                                controllerClassName, method.getNameAsString(), interfaceName, methodCall.getNameAsString(), methodCall.getBegin().get().line, vulnerableLineContent));
                                                     }
                                                 });
                                             });
@@ -317,6 +318,18 @@ public class SQLInjectScan {
                 e.printStackTrace();
             }
         }
+    }
+
+    private static String getLineContent(File file, int lineNumber) {
+        try {
+            List<String> lines = Files.readAllLines(file.toPath());
+            if (lineNumber >= 0 && lineNumber < lines.size()) {
+                return lines.get(lineNumber).trim();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return "";
     }
 
     public static void generateHtmlReport(List<String> results, String filePath) {
@@ -366,4 +379,3 @@ public class SQLInjectScan {
         }
     }
 }
-
