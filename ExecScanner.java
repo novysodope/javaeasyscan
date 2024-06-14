@@ -143,16 +143,31 @@ public class ExecScanner {
         public void visit(MethodCallExpr methodCall, String filePath) {
             if (methodCall.getNameAsString().equals("exec")) {
                 int lineNumber = methodCall.getBegin().isPresent() ? methodCall.getBegin().get().line : -1;
-                System.out.println(currentClassName + "类存在exec命令执行，在" + currentMethodName + "方法中，第" + lineNumber + "行");
+                System.out.println(currentClassName + "类存在exec命令执行，在" + currentMethodName + "方法中，第" + lineNumber + "行:");
+                printLineContent(filePath, lineNumber);
                 findUsages(currentClassName, currentMethodName, javaFiles, javaParser, new HashSet<>());
             } else if (methodCall.getNameAsString().equals("start")) {
                 if (isProcessBuilderStartMethod(methodCall)) {
                     int lineNumber = methodCall.getBegin().isPresent() ? methodCall.getBegin().get().line : -1;
-                    System.out.println(currentClassName + "类存在ProcessBuilder命令执行，在" + currentMethodName + "方法中，第" + lineNumber + "行");
+                    System.out.println(currentClassName + "类存在ProcessBuilder命令执行，在" + currentMethodName + "方法中，第" + lineNumber + "行:");
+                    printLineContent(filePath, lineNumber);
                     findUsages(currentClassName, currentMethodName, javaFiles, javaParser, new HashSet<>());
                 }
             }
             super.visit(methodCall, filePath);
+        }
+
+        private void printLineContent(String filePath, int lineNumber) {
+            if (lineNumber > 0) {
+                try {
+                    List<String> lines = Files.readAllLines(new File(filePath).toPath());
+                    if (lineNumber <= lines.size()) {
+                        System.out.println(lines.get(lineNumber - 1).trim());
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
 
         private boolean isProcessBuilderStartMethod(MethodCallExpr methodCall) {
@@ -201,10 +216,11 @@ public class ExecScanner {
                     if (methodCall.getScope().isPresent() && methodCall.getScope().get().toString().toLowerCase().contains(className.toLowerCase()) && methodCall.getNameAsString().contains(methodName)) {
                         int lineNumber = methodCall.getBegin().isPresent() ? methodCall.getBegin().get().line : -1;
                         String callingMethodName = getContainingMethodName(methodCall);
-                        System.out.println("具体调用信息：\n" + filePath + " 第" + lineNumber + "行中 " + fileClassName + "类的" + callingMethodName + "方法调用到了 " + className + "." + methodName + "\n");
-                        String calledMethod = fileClassName + "." + methodCall.getNameAsString();
-                        if (!visitedMethods.contains(calledMethod)) {
-                            visitedMethods.add(calledMethod);
+                        System.out.println("具体调用信息：\n" + filePath + " 第" + lineNumber + "行中 " + fileClassName + "类的" + callingMethodName + "方法调用到了 " + className + "的" + methodName + "方法：");
+                        printLineContent(filePath, lineNumber);
+                        String methodKey = fileClassName + "." + callingMethodName;
+                        if (!visitedMethods.contains(methodKey)) {
+                            visitedMethods.add(methodKey);
                             findUsages(fileClassName, callingMethodName, javaFiles, javaParser, visitedMethods);
                         }
                     }
@@ -230,6 +246,19 @@ public class ExecScanner {
                         new UsageVisitor(className, methodName, javaFiles, javaParser, visitedMethods).visit(cu, javaFile.getAbsolutePath());
                     } catch (IOException e) {
                         System.err.println("Failed to parse file: " + javaFile.getAbsolutePath());
+                        e.printStackTrace();
+                    }
+                }
+            }
+
+            private void printLineContent(String filePath, int lineNumber) {
+                if (lineNumber > 0) {
+                    try {
+                        List<String> lines = Files.readAllLines(new File(filePath).toPath());
+                        if (lineNumber <= lines.size()) {
+                            System.out.println(lines.get(lineNumber - 1).trim() + "\n");
+                        }
+                    } catch (IOException e) {
                         e.printStackTrace();
                     }
                 }
