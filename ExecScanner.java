@@ -4,6 +4,7 @@ import com.github.javaparser.JavaParser;
 import com.github.javaparser.ParseProblemException;
 import com.github.javaparser.ParserConfiguration;
 import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.*;
@@ -77,6 +78,13 @@ public class ExecScanner {
     private static class MethodCallVisitor extends VoidVisitorAdapter<String> {
         private final Map<String, String> variableDeclarations = new HashMap<>();
         private String currentMethodName = "";
+        private String currentClassName = "";
+
+        @Override
+        public void visit(ClassOrInterfaceDeclaration classOrInterface, String filePath) {
+            currentClassName = classOrInterface.getNameAsString();
+            super.visit(classOrInterface, filePath);
+        }
 
         @Override
         public void visit(MethodDeclaration methodDeclaration, String filePath) {
@@ -126,7 +134,7 @@ public class ExecScanner {
             if (methodCall.getNameAsString().equals("exec")) {
                 int lineNumber = methodCall.getBegin().isPresent() ? methodCall.getBegin().get().line : -1;
                 System.out.println("Found 'exec' method call in file: " + filePath + " at line " + lineNumber);
-                System.out.println("这个代码属于方法： " + currentMethodName);
+                System.out.println("Inside method: " + currentMethodName + " of class: " + currentClassName);
                 methodCall.getScope().ifPresent(scope -> {
                     String scopeStr = scope.toString();
                     if (variableDeclarations.containsKey(scopeStr)) {
@@ -139,7 +147,7 @@ public class ExecScanner {
                 if (isProcessBuilderStartMethod(methodCall)) {
                     int lineNumber = methodCall.getBegin().isPresent() ? methodCall.getBegin().get().line : -1;
                     System.out.println("Found 'start' method call in file: " + filePath + " at line " + lineNumber);
-                    System.out.println("这个代码属于方法: " + currentMethodName);
+                    System.out.println("Inside method: " + currentMethodName + " of class: " + currentClassName);
                     methodCall.getScope().ifPresent(scope -> {
                         String scopeStr = scope.toString();
                         if (variableDeclarations.containsKey(scopeStr) && variableDeclarations.get(scopeStr).equals("new ProcessBuilder()")) {
