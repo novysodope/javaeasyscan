@@ -232,8 +232,8 @@ public class CodeAuditMain {
                                             String calledInterfaceName = scope.toString();
                                             interfaceToVulnerableMethodsMap.forEach((interfaceName, vulnerableMethods) -> {
                                                 if (calledInterfaceName!=null && vulnerableMethods.contains(methodCall.getNameAsString())) {
-                                                    System.out.printf("%s 类的 %s 方法调用了接口 %s 的 %s 方法%n",
-                                                            controllerClassName, method.getNameAsString(), interfaceName, methodCall.getNameAsString());
+                                                    System.out.printf("%s 类的 %s 方法调用了接口 %s 的 %s 方法，在第 %s 行%n",
+                                                            controllerClassName, method.getNameAsString(), interfaceName, methodCall.getNameAsString(),methodCall.getBegin().get().line);
                                                 }
                                             });
                                         });
