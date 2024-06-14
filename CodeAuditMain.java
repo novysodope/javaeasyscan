@@ -246,16 +246,28 @@ public class SQLInjectScan {
                                             namespaceToVulnerabilitiesMap.forEach((namespace, vulnerabilities) -> {
                                                 String mapperInterfaceName = namespace.substring(namespace.lastIndexOf('.') + 1);
                                                 if (mapperInterfaceName != null && vulnerabilities.stream().anyMatch(v -> v.methodName.equals(methodCall.getNameAsString()))) {
-                                                    VulnerabilityDetail vulnerability = vulnerabilities.stream()
-                                                            .filter(v -> v.methodName.equals(methodCall.getNameAsString()))
-                                                            .findFirst().orElse(null);
-                                                    if (vulnerability != null) {
-                                                        vulnerability.addImplCall(String.format("调用信息如下:%n%s 类实现了接口 %s , 调用了 %s 的 %s 方法",
-                                                                className, String.join(", ", implementedInterfaces), mapperInterfaceName, methodCall.getNameAsString()));
-                                                        implementedInterfaces.forEach(interfaceName -> {
-                                                            interfaceToVulnerabilitiesMap.putIfAbsent(interfaceName, new ArrayList<>());
-                                                            interfaceToVulnerabilitiesMap.get(interfaceName).add(vulnerability);
-                                                        });
+                                                    boolean found = false;
+                                                    String fullMethodName = mapperInterfaceName.toLowerCase() + "." + methodCall.getNameAsString().toLowerCase();
+                                                    try {
+                                                        List<String> lines = Files.readAllLines(javaFile.toPath());
+                                                        for (String line : lines) {
+                                                            if (line.toLowerCase().contains(fullMethodName)) {
+                                                                found = true;
+                                                                break;
+                                                            }
+                                                        }
+                                                    } catch (IOException e) {
+                                                        e.printStackTrace();
+                                                    }
+                                                    if (found) {
+                                                        VulnerabilityDetail vulnerability = vulnerabilities.stream().filter(v -> v.methodName.equals(methodCall.getNameAsString())).findFirst().orElse(null);
+                                                        if (vulnerability != null) {
+                                                            vulnerability.addImplCall(String.format("调用信息如下:%n%s 类实现了接口 %s , 调用了 %s 的 %s 方法", className, String.join(", ", implementedInterfaces), mapperInterfaceName, methodCall.getNameAsString()));
+                                                            implementedInterfaces.forEach(interfaceName -> {
+                                                                interfaceToVulnerabilitiesMap.putIfAbsent(interfaceName, new ArrayList<>());
+                                                                interfaceToVulnerabilitiesMap.get(interfaceName).add(vulnerability);
+                                                            });
+                                                        }
                                                     }
                                                 }
                                             });
@@ -300,7 +312,9 @@ public class SQLInjectScan {
                                             String calledInterfaceName = scope.toString();
                                             interfaceToVulnerabilitiesMap.forEach((interfaceName, vulnerabilities) -> {
                                                 vulnerabilities.forEach(vulnerability -> {
-                                                    if (calledInterfaceName != null && vulnerability.methodName.equals(methodCall.getNameAsString())) {
+                                                    String intfmet = (interfaceName + "." + vulnerability.methodName).toLowerCase();
+                                                    String met = methodCall.toString().toLowerCase();
+                                                    if (interfaceName != null && met.contains(intfmet)) {
                                                         String vulnerableLineContent = getLineContent(javaFile, methodCall.getBegin().get().line - 1);
                                                         vulnerability.addControllerCall(String.format("%s 类的 %s 方法调用了接口 %s 的 %s 方法，在第 %d 行：%n%s%n",
                                                                 controllerClassName, method.getNameAsString(), interfaceName, methodCall.getNameAsString(), methodCall.getBegin().get().line, vulnerableLineContent));
