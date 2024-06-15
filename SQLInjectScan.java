@@ -28,7 +28,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 
 /**
- * @Describe Fupo JavaEasyScan for springboot/springmvc
+ * @Describe SQL注入审计模块
  * @Author novy
  * @Version 1.0
  * @CreateDate 2024/6/13 14:53
