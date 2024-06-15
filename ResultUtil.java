@@ -29,9 +29,9 @@ public class ResultUtil {
         String timestamp = sdf.format(new Date());
         String filePath = "audit_report_" + timestamp + ".html";
         boolean fileExists = new File(filePath).exists();
-        String newContentHash = generateHash(results);
 
-        // Read existing file content if it exists
+        //防止多次扫描的结果相同导致的重复数据追加，具体实现：往页面里加哈希，然后读取html内容查看是否包含已有的哈希，真是聪明 ≥︺‿︺≤
+        String newContentHash = generateHash(results);
         StringBuilder existingContent = new StringBuilder();
         if (fileExists) {
             try {
@@ -44,8 +44,6 @@ public class ResultUtil {
                 e.printStackTrace();
             }
         }
-
-        // Check if the new content is already in the file
         if (existingContent.toString().contains(newContentHash)) {
             logger.info("no new content to add, report is latest");
             return;
@@ -100,10 +98,7 @@ public class ResultUtil {
                 writer.println("</body>");
                 writer.println("</html>");
             }
-
-            // Write the new content hash to the file
-            writer.println("<!-- Hash: " + newContentHash + " -->");
-
+            writer.println("<!-- report hash: " + newContentHash + " -->");
             logger.info("create report: " + filePath);
         } catch (IOException e) {
             e.printStackTrace();
@@ -125,20 +120,5 @@ public class ResultUtil {
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("Error generating hash", e);
         }
-    }
-
-    private static boolean isDuplicateContent(String filePath, String newContentHash) {
-        try {
-            List<String> lines = Files.readAllLines(Paths.get(filePath));
-            for (String line : lines) {
-                if (line.startsWith("<!-- Hash: ")) {
-                    String existingHash = line.substring(10, line.length() - 4);
-                    return existingHash.equals(newContentHash);
-                }
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return false;
     }
 }
