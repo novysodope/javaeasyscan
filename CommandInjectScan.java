@@ -11,6 +11,8 @@ import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
 import com.github.javaparser.symbolsolver.JavaSymbolSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeSolver;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -27,14 +29,16 @@ import java.util.*;
  * @CreateDate 20:02 2024/6/14
  **/
 public class CommandInjectScan {
+    public static ResultUtil resultUtil;
+    public static String topic = "命令注入";
+    private static final Logger logger = LoggerFactory.getLogger(CommandInjectScan.class);
 
     public static void main(String[] args) {
         File rootDir = new File(args[0]);
+        logger.info("Poject: " + rootDir.getAbsolutePath());
         List<String> results = scanJavaFiles(rootDir);
         if (!results.isEmpty()) {
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss");
-            String timestamp = sdf.format(new Date());
-            generateHtmlReport(results, "exec_scan_report_" + timestamp + ".html");
+            resultUtil.generateHtmlReport(results, topic);
         } else {
             System.out.println("\nnot found result\n");
         }
@@ -50,6 +54,7 @@ public class CommandInjectScan {
         JavaParser javaParser = new JavaParser(parserConfiguration);
 
         for (File javaFile : javaFiles) {
+            logger.info("scan file: " + javaFile.getName());
             try {
                 CompilationUnit cu = javaParser.parse(javaFile).getResult().get();
                 MethodCallVisitor methodCallVisitor = new MethodCallVisitor(javaFiles, javaParser, results);
@@ -144,6 +149,10 @@ public class CommandInjectScan {
             if (methodCall.getNameAsString().equals("exec")) {
                 int lineNumber = methodCall.getBegin().isPresent() ? methodCall.getBegin().get().line : -1;
                 StringBuilder result = new StringBuilder();
+                methodCall.getScope().ifPresent(scope -> {
+                    logger.info("method call scope: " + scope );
+                });
+
                 result.append(currentClassName).append("类存在exec命令执行，在").append(currentMethodName).append("方法中，第").append(lineNumber).append("行:\n");
                 result.append("<pre style=\"color:red;\">" + getLineContent(filePath, lineNumber)).append("</pre>\n");
                 findUsages(currentClassName, currentMethodName, javaFiles, javaParser, new HashSet<>(), result);
@@ -271,54 +280,6 @@ public class CommandInjectScan {
                 }
                 return "";
             }
-        }
-    }
-
-    public static void generateHtmlReport(List<String> results, String filePath) {
-        try (PrintWriter writer = new PrintWriter(new FileWriter(filePath))) {
-            writer.println("<html>");
-            writer.println("<head>");
-            writer.println("<title>Fupo JavaEasyScan Result</title>");
-            writer.println("<style>");
-            writer.println("body { font-family: Arial, sans-serif; margin: 40px; }");
-            writer.println("h1 { text-align: center; color: #333; }");
-            writer.println(".container { margin-bottom: 20px; }");
-            writer.println(".title { font-size: 18px; font-weight: bold; cursor: pointer; padding: 10px; background: #eee; border: 1px solid #ddd; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }");
-            writer.println(".content { display: none; padding: 10px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 4px 4px; }");
-            writer.println(".content p { margin: 0; white-space: pre-wrap; }");
-            writer.println(".arrow { font-size: 12px; margin-left: 10px; }");
-            writer.println("</style>");
-            writer.println("</head>");
-            writer.println("<body>");
-            writer.println("<h1>Fupo JavaEasyScan CodeAudit Report</h1>");
-            for (int i = 0; i < results.size(); i++) {
-                writer.println("<div class='container'>");
-                writer.printf("<div class='title'>命令执行 %d <span class='arrow'>&#9654;</span></div>%n", i + 1);
-                writer.println("<div class='content'>");
-                writer.printf("<p>%s</p>%n", results.get(i).replace("\n", "<br>"));
-                writer.println("</div>");
-                writer.println("</div>");
-            }
-            writer.println("<script>");
-            writer.println("document.querySelectorAll('.title').forEach(title => {");
-            writer.println("    title.addEventListener('click', () => {");
-            writer.println("        const content = title.nextElementSibling;");
-            writer.println("        const arrow = title.querySelector('.arrow');");
-            writer.println("        if (content.style.display === 'block') {");
-            writer.println("            content.style.display = 'none';");
-            writer.println("            arrow.innerHTML = '&#9654;';");
-            writer.println("        } else {");
-            writer.println("            content.style.display = 'block';");
-            writer.println("            arrow.innerHTML = '&#9660;';");
-            writer.println("        }");
-            writer.println("    });");
-            writer.println("});");
-            writer.println("</script>");
-            writer.println("</body>");
-            writer.println("</html>");
-            System.out.println("Created report: " + filePath);
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 }
