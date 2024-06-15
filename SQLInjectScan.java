@@ -35,7 +35,10 @@ import java.util.*;
  **/
 
 public class SQLInjectScan {
+    public static String topic = "SQL注入";
     private static final Logger logger = LoggerFactory.getLogger(SQLInjectScan.class);
+
+    public static ResultUtil resultUtil;
 
     // 优化输出，显示完整的调用链
     static class VulnerabilityDetail {
@@ -121,11 +124,9 @@ public class SQLInjectScan {
                 results.addAll(outputs);
             }
         }
-        
+
         if (results!=null || !results.equals("")) {
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss");
-            String timestamp = sdf.format(new Date());
-            generateHtmlReport(results, "audit_report_" + timestamp + ".html");
+            resultUtil.generateHtmlReport(results,topic);
         }else {
             System.out.println("\nnot found result\n");
         }
@@ -362,51 +363,4 @@ public class SQLInjectScan {
         return "";
     }
 
-    public static void generateHtmlReport(List<String> results, String filePath) {
-        try (PrintWriter writer = new PrintWriter(new FileWriter(filePath))) {
-            writer.println("<html>");
-            writer.println("<head>");
-            writer.println("<title>Fupo JavaEasyScan Result</title>");
-            writer.println("<style>");
-            writer.println("body { font-family: Arial, sans-serif; margin: 40px; }");
-            writer.println("h1 { text-align: center; color: #333; }");
-            writer.println(".container { margin-bottom: 20px; }");
-            writer.println(".title { font-size: 18px; font-weight: bold; cursor: pointer; padding: 10px; background: #eee; border: 1px solid #ddd; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }");
-            writer.println(".content { display: none; padding: 10px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 4px 4px; }");
-            writer.println(".content p { margin: 0; white-space: pre-wrap; }");
-            writer.println(".arrow { font-size: 12px; margin-left: 10px; }");
-            writer.println("</style>");
-            writer.println("</head>");
-            writer.println("<body>");
-            writer.println("<h1>Fupo JavaEasyScan CodeAudit Report</h1>");
-            for (int i = 0; i < results.size(); i++) {
-                writer.println("<div class='container'>");
-                writer.printf("<div class='title'>SQL注入 %d <span class='arrow'>&#9654;</span></div>%n", i + 1);
-                writer.println("<div class='content'>");
-                writer.printf("<p>%s</p>%n", results.get(i).replace("\n", "<br>"));
-                writer.println("</div>");
-                writer.println("</div>");
-            }
-            writer.println("<script>");
-            writer.println("document.querySelectorAll('.title').forEach(title => {");
-            writer.println("    title.addEventListener('click', () => {");
-            writer.println("        const content = title.nextElementSibling;");
-            writer.println("        const arrow = title.querySelector('.arrow');");
-            writer.println("        if (content.style.display === 'block') {");
-            writer.println("            content.style.display = 'none';");
-            writer.println("            arrow.innerHTML = '&#9654;';");
-            writer.println("        } else {");
-            writer.println("            content.style.display = 'block';");
-            writer.println("            arrow.innerHTML = '&#9660;';");
-            writer.println("        }");
-            writer.println("    });");
-            writer.println("});");
-            writer.println("</script>");
-            writer.println("</body>");
-            writer.println("</html>");
-            logger.info("create report: " + filePath);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
 }
