@@ -7,9 +7,14 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * @Describe
@@ -24,8 +29,29 @@ public class ResultUtil {
         String timestamp = sdf.format(new Date());
         String filePath = "audit_report_" + timestamp + ".html";
         boolean fileExists = new File(filePath).exists();
+        String newContentHash = generateHash(results);
 
-        try (PrintWriter writer = new PrintWriter(new FileWriter(filePath, true))) { // enable append mode
+        // Read existing file content if it exists
+        StringBuilder existingContent = new StringBuilder();
+        if (fileExists) {
+            try {
+                List<String> lines = Files.readAllLines(Paths.get(filePath));
+                for (String line : lines) {
+                    existingContent.append(line);
+                    existingContent.append("\n");
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        // Check if the new content is already in the file
+        if (existingContent.toString().contains(newContentHash)) {
+            logger.info("no new content to add, report is latest");
+            return;
+        }
+
+        try (PrintWriter writer = new PrintWriter(new FileWriter(filePath, true))) {
             if (!fileExists) {
                 writer.println("<html>");
                 writer.println("<head>");
@@ -75,10 +101,44 @@ public class ResultUtil {
                 writer.println("</html>");
             }
 
+            // Write the new content hash to the file
+            writer.println("<!-- Hash: " + newContentHash + " -->");
+
             logger.info("create report: " + filePath);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
+    private static String generateHash(List<String> content) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            String concatenatedContent = content.stream().collect(Collectors.joining());
+            byte[] hash = digest.digest(concatenatedContent.getBytes());
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("Error generating hash", e);
+        }
+    }
+
+    private static boolean isDuplicateContent(String filePath, String newContentHash) {
+        try {
+            List<String> lines = Files.readAllLines(Paths.get(filePath));
+            for (String line : lines) {
+                if (line.startsWith("<!-- Hash: ")) {
+                    String existingHash = line.substring(10, line.length() - 4);
+                    return existingHash.equals(newContentHash);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
 }
