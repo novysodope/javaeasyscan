@@ -30,7 +30,7 @@ public class ResultUtil {
         String filePath = "audit_report_" + timestamp + ".html";
         boolean fileExists = new File(filePath).exists();
 
-        // 防止多次扫描的结果相同导致的重复数据追加
+        //防止多次扫描的结果相同导致的重复数据追加，具体实现：往页面里加哈希，然后读取html内容查看是否包含已有的哈希，真是聪明 ≥︺‿︺≤
         String newContentHash = generateHash(results);
         StringBuilder existingContent = new StringBuilder();
         if (fileExists) {
