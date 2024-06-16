@@ -10,18 +10,30 @@ import java.io.File;
  **/
 public class Main {
     public static void main(String[] args) throws Exception {
-        File rootDir = new File(args[0]);
-//        SQLInjectScan sqlInjectScan = new SQLInjectScan();
-//        SQLInjecSplitScan sqlInjecSplitScan = new SQLInjecSplitScan();
-//        CommandInjectScan commandInjectScan = new CommandInjectScan();
-//        GroovyShellScan groovyShellScan = new GroovyShellScan();
-//        DeserializationFastJsonScan deserializationFastJsonScan = new DeserializationFastJsonScan();
 
+
+        String help = "Usage: java -jar javaeasyscan.jar source_code_path";
+        String author = "" +
+                "███████╗██╗   ██╗██████╗  ██████╗\n" +
+                "██╔════╝██║   ██║██╔══██╗██╔═══██╗\n" +
+                "█████╗  ██║   ██║██████╔╝██║   ██║\n" +
+                "██╔══╝  ██║   ██║██╔═══╝ ██║   ██║\n" +
+                "██║     ╚██████╔╝██║     ╚██████╔╝\n" +
+                "╚═╝      ╚═════╝ ╚═╝      ╚═════╝\n" +
+                "                       JAVAEASYSCANNER  Fupo's series\n" +
+                "—————————————————————————————————————————————————————\n";
+        System.out.println(author);
+
+        if (args.length==0){
+            System.out.println("Missing parameter, please enter the source code directory\n" + help);
+            System.exit(0);
+        }
+
+        File rootDir = new File(args[0]);
         SQLInjectScan.main(rootDir.getAbsolutePath());
         SQLInjecSplitScan.main(rootDir.getAbsolutePath());
         CommandInjectScan.main(rootDir.getAbsolutePath());
         GroovyShellScan.main(rootDir.getAbsolutePath());
         DeserializationFastJsonScan.main(rootDir.getAbsolutePath());
-
     }
 }
