@@ -9,6 +9,8 @@ import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
 import com.github.javaparser.utils.SourceRoot;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.nio.file.Paths;
@@ -21,8 +23,10 @@ import java.util.*;
  **/
 public class SQLInjecSplitScan {
     public static ResultUtil resultUtil = new ResultUtil();
+    private static final Logger logger = LoggerFactory.getLogger(SQLInjecSplitScan.class);
 
     public static void main(String args) {
+        logger.info("Starting SQLInjecSplit module");
         File rootDir = new File(args);
         scanJavaFiles(rootDir);
     }
@@ -30,7 +34,9 @@ public class SQLInjecSplitScan {
     public static void scanJavaFiles(File dir) {
         ParserConfiguration parserConfiguration = new ParserConfiguration();
         SourceRoot sourceRoot = new SourceRoot(Paths.get(dir.getAbsolutePath()), parserConfiguration);
+
         List<ParseResult<CompilationUnit>> parseResults = sourceRoot.tryToParseParallelized();
+
         SqlInjectionVisitor visitor = new SqlInjectionVisitor();
         List<String> results = new ArrayList<>();
 
