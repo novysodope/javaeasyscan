@@ -6,10 +6,7 @@ import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.VariableDeclarator;
-import com.github.javaparser.ast.expr.AssignExpr;
-import com.github.javaparser.ast.expr.Expression;
-import com.github.javaparser.ast.expr.MethodCallExpr;
-import com.github.javaparser.ast.expr.ObjectCreationExpr;
+import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
 import com.github.javaparser.symbolsolver.JavaSymbolSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
@@ -35,7 +32,6 @@ public class DeserializationFastJsonScan {
 
     public static void main(String[] args) {
         File rootDir = new File(args[0]);
-        logger.info("Poject: " + rootDir.getAbsolutePath());
         List<String> results = scanJavaFiles(rootDir);
         if (!results.isEmpty()) {
             resultUtil.generateHtmlReport(results, topic);
@@ -88,6 +84,7 @@ public class DeserializationFastJsonScan {
         private final List<File> javaFiles;
         private final JavaParser javaParser;
         private final List<String> results;
+        private String currentFilePath;
 
         public MethodCallVisitor(List<File> javaFiles, JavaParser javaParser, List<String> results) {
             this.javaFiles = javaFiles;
@@ -107,53 +104,9 @@ public class DeserializationFastJsonScan {
             super.visit(methodDeclaration, filePath);
         }
 
-//        @Override
-//        public void visit(VariableDeclarator variableDeclarator, String filePath) {
-//            super.visit(variableDeclarator, filePath);
-//            if (variableDeclarator.getInitializer().isPresent()) {
-//                Expression initializer = variableDeclarator.getInitializer().get();
-//                if (initializer.isMethodCallExpr()) {
-//                    MethodCallExpr methodCall = initializer.asMethodCallExpr();
-//                    if (methodCall.getNameAsString().equals("parseObject")||methodCall.getNameAsString().equals("parse")) {
-//                        variableDeclarations.put(variableDeclarator.getNameAsString(), "JSONObject.parseObject");
-//                        variableDeclarations.put(variableDeclarator.getNameAsString(), "JSON.parseObject");
-//                        variableDeclarations.put(variableDeclarator.getNameAsString(), "JSONObject.parse");
-//                        variableDeclarations.put(variableDeclarator.getNameAsString(), "JSON.parse");
-//                    }
-//                    //System.out.println(variableDeclarations);
-//                } else if (initializer.isObjectCreationExpr()) {
-//                    ObjectCreationExpr objectCreationExpr = initializer.asObjectCreationExpr();
-//                    if (objectCreationExpr.getType().getNameAsString().equals("parse")) {
-//                        variableDeclarations.put(variableDeclarator.getNameAsString(), "JSONObject.parse");
-//                        variableDeclarations.put(variableDeclarator.getNameAsString(), "JSON.parse");
-//                    }
-//                }
-//            }
-//        }
-
-//        @Override
-//        public void visit(AssignExpr assignExpr, String filePath) {
-//            super.visit(assignExpr, filePath);
-//            if (assignExpr.getTarget().isNameExpr() && assignExpr.getValue().isMethodCallExpr()) {
-//                String variableName = assignExpr.getTarget().asNameExpr().getNameAsString();
-//                MethodCallExpr methodCall = assignExpr.getValue().asMethodCallExpr();
-//                if (methodCall.getNameAsString().equals("parseObject")) {
-//                    variableDeclarations.put(variableName, "JSONObject.parseObject");
-//                    variableDeclarations.put(variableName, "JSON.parseObject");
-//                }
-//            } else if (assignExpr.getTarget().isNameExpr() && assignExpr.getValue().isObjectCreationExpr()) {
-//                String variableName = assignExpr.getTarget().asNameExpr().getNameAsString();
-//                ObjectCreationExpr objectCreationExpr = assignExpr.getValue().asObjectCreationExpr();
-//                if (objectCreationExpr.getType().getNameAsString().equals("parse")) {
-//                    variableDeclarations.put(variableName, "JSONObject.parse");
-//                    variableDeclarations.put(variableName, "JSON.parse");
-//                }
-//            }
-//        }
 
         @Override
         public void visit(MethodCallExpr methodCall, String filePath) {
-
             if (methodCall.getNameAsString().equals("parseObject")) {
                 int lineNumber = methodCall.getBegin().isPresent() ? methodCall.getBegin().get().line : -1;
                 StringBuilder result = new StringBuilder();
@@ -197,7 +150,7 @@ public class DeserializationFastJsonScan {
 
         private boolean isProcessBuilderStartMethod(MethodCallExpr methodCall) {
             try {
-                return methodCall.toString().contains("JSONObject.parse") || methodCall.resolve().getQualifiedSignature().contains("JSON.parse");
+                return methodCall.toString().contains("JSONObject.parse") || methodCall.toString().contains("JSON.parse");
             } catch (Exception e) {
                 return false;
             }
