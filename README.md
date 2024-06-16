@@ -83,3 +83,4 @@ public class ProductServiceImpl implements ProductService {
 # 其他
 - 如果打包没有把依赖打包进去，请查看 [解决maven打jar包时不把依赖打包进去的问题](https://blog.csdn.net/qq_30786785/article/details/125506886)
 - 因为要带项目了，所以要视情况挤时间出来更新，如果你有想法等不及的话可以下载代码改或者加入本项目直接pull更新或者提交issues，我会不定期查看，谢谢
+- 不爱请别伤害，不好的评论我会删
