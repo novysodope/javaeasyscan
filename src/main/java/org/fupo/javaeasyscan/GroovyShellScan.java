@@ -31,6 +31,7 @@ public class GroovyShellScan {
     private static final Logger logger = LoggerFactory.getLogger(CommandInjectScan.class);
 
     public static void main(String args) {
+        logger.info("Starting Groovy Code_Execution  module");
         File rootDir = new File(args);
         List<String> results = scanJavaFiles(rootDir);
         if (!results.isEmpty()) {
