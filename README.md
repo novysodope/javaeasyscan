@@ -25,7 +25,7 @@ java -jar javaeasyscan.jar 源码目录（暂不支持反编译class）
 
 ## 工具实现思路：
 
-使用反向跟进的方法，定位漏洞点 ⟶ 定位漏洞所属方法、所属类 ⟶ 往上查找所属类及所属方法被调用的地方 ⟶ 直至没有被调用为止
+使用反向跟进的方法: `定位漏洞点 ⟶ 定位漏洞所属方法、所属类 ⟶ 往上查找所属类及所属方法被调用的地方 ⟶ 直至没有被调用为止`
 
 **示例:**
 
@@ -52,7 +52,7 @@ public class ProductServiceImpl implements ProductService {
         return productMapper.selectUser(example);
     }
 ```
-随后记录ProductServiceImpl类、selectUser方法和ProductService，然后往前找调用了ProductService.selectUser的地方
+随后记录`ProductServiceImpl`类、`selectUser`方法和`ProductService`，然后往前找调用了`ProductService.selectUser`的地方
 ```java
 @ResponseBody
     @RequestMapping("/sqlin")
