@@ -30,6 +30,7 @@ public class DeserializationFastJsonScan {
     private static final Logger logger = LoggerFactory.getLogger(CommandInjectScan.class);
 
     public static void main(String args) {
+        logger.info("Starting FastJson deserialization module");
         File rootDir = new File(args);
         List<String> results = scanJavaFiles(rootDir);
         if (!results.isEmpty()) {
