@@ -18,7 +18,7 @@
 # 使用
 java环境：JDK1.8
 
-本工具的优势在于不用自己写规则，所以在打包好项目后，直接按照以下方式启动即可
+本工具的优势在于不用自己写规则，所以在打包好项目后（懒得打包的可以直接到这里下载已经打包好的: [releases](https://github.com/novysodope/javaeasyscan/releases)），直接按照以下方式启动即可
 ```java
 java -jar javaeasyscan.jar 源码目录（暂不支持反编译class）
 ```
