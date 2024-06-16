@@ -35,7 +35,6 @@ public class CommandInjectScan {
 
     public static void main(String[] args) {
         File rootDir = new File(args[0]);
-        logger.info("Poject: " + rootDir.getAbsolutePath());
         List<String> results = scanJavaFiles(rootDir);
         if (!results.isEmpty()) {
             resultUtil.generateHtmlReport(results, topic);
@@ -106,7 +105,7 @@ public class CommandInjectScan {
             currentMethodName = methodDeclaration.getNameAsString();
             super.visit(methodDeclaration, filePath);
         }
-        
+
         @Override
         public void visit(MethodCallExpr methodCall, String filePath) {
             if (methodCall.getNameAsString().equals("exec")) {
