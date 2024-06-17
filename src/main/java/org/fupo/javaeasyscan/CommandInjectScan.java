@@ -103,42 +103,42 @@ public class CommandInjectScan {
             super.visit(methodDeclaration, filePath);
         }
 
-        // @Override
-        // public void visit(VariableDeclarator variableDeclarator, String filePath) {
-        //     super.visit(variableDeclarator, filePath);
-        //     if (variableDeclarator.getInitializer().isPresent()) {
-        //         Expression initializer = variableDeclarator.getInitializer().get();
-        //         if (initializer.isMethodCallExpr()) {
-        //             MethodCallExpr methodCall = initializer.asMethodCallExpr();
-        //             if (methodCall.getNameAsString().equals("getRuntime") && methodCall.getScope().isPresent() && methodCall.getScope().get().toString().equals("Runtime")) {
-        //                 variableDeclarations.put(variableDeclarator.getNameAsString(), "Runtime.getRuntime()");
-        //             }
-        //         } else if (initializer.isObjectCreationExpr()) {
-        //             ObjectCreationExpr objectCreationExpr = initializer.asObjectCreationExpr();
-        //             if (objectCreationExpr.getType().getNameAsString().equals("ProcessBuilder")) {
-        //                 variableDeclarations.put(variableDeclarator.getNameAsString(), "new ProcessBuilder()");
-        //             }
-        //         }
-        //     }
-        // }
+        @Override
+        public void visit(VariableDeclarator variableDeclarator, String filePath) {
+            super.visit(variableDeclarator, filePath);
+            if (variableDeclarator.getInitializer().isPresent()) {
+                Expression initializer = variableDeclarator.getInitializer().get();
+                if (initializer.isMethodCallExpr()) {
+                    MethodCallExpr methodCall = initializer.asMethodCallExpr();
+                    if (methodCall.getNameAsString().equals("getRuntime") && methodCall.getScope().isPresent() && methodCall.getScope().get().toString().equals("Runtime")) {
+                        variableDeclarations.put(variableDeclarator.getNameAsString(), "Runtime.getRuntime()");
+                    }
+                } else if (initializer.isObjectCreationExpr()) {
+                    ObjectCreationExpr objectCreationExpr = initializer.asObjectCreationExpr();
+                    if (objectCreationExpr.getType().getNameAsString().equals("ProcessBuilder")) {
+                        variableDeclarations.put(variableDeclarator.getNameAsString(), "new ProcessBuilder()");
+                    }
+                }
+            }
+        }
 
-        // @Override
-        // public void visit(AssignExpr assignExpr, String filePath) {
-        //     super.visit(assignExpr, filePath);
-        //     if (assignExpr.getTarget().isNameExpr() && assignExpr.getValue().isMethodCallExpr()) {
-        //         String variableName = assignExpr.getTarget().asNameExpr().getNameAsString();
-        //         MethodCallExpr methodCall = assignExpr.getValue().asMethodCallExpr();
-        //         if (methodCall.getNameAsString().equals("getRuntime") && methodCall.getScope().isPresent() && methodCall.getScope().get().toString().equals("Runtime")) {
-        //             variableDeclarations.put(variableName, "Runtime.getRuntime()");
-        //         }
-        //     } else if (assignExpr.getTarget().isNameExpr() && assignExpr.getValue().isObjectCreationExpr()) {
-        //         String variableName = assignExpr.getTarget().asNameExpr().getNameAsString();
-        //         ObjectCreationExpr objectCreationExpr = assignExpr.getValue().asObjectCreationExpr();
-        //         if (objectCreationExpr.getType().getNameAsString().equals("ProcessBuilder")) {
-        //             variableDeclarations.put(variableName, "new ProcessBuilder()");
-        //         }
-        //     }
-        // }
+        @Override
+        public void visit(AssignExpr assignExpr, String filePath) {
+            super.visit(assignExpr, filePath);
+            if (assignExpr.getTarget().isNameExpr() && assignExpr.getValue().isMethodCallExpr()) {
+                String variableName = assignExpr.getTarget().asNameExpr().getNameAsString();
+                MethodCallExpr methodCall = assignExpr.getValue().asMethodCallExpr();
+                if (methodCall.getNameAsString().equals("getRuntime") && methodCall.getScope().isPresent() && methodCall.getScope().get().toString().equals("Runtime")) {
+                    variableDeclarations.put(variableName, "Runtime.getRuntime()");
+                }
+            } else if (assignExpr.getTarget().isNameExpr() && assignExpr.getValue().isObjectCreationExpr()) {
+                String variableName = assignExpr.getTarget().asNameExpr().getNameAsString();
+                ObjectCreationExpr objectCreationExpr = assignExpr.getValue().asObjectCreationExpr();
+                if (objectCreationExpr.getType().getNameAsString().equals("ProcessBuilder")) {
+                    variableDeclarations.put(variableName, "new ProcessBuilder()");
+                }
+            }
+        }
 
         @Override
         public void visit(MethodCallExpr methodCall, String filePath) {
