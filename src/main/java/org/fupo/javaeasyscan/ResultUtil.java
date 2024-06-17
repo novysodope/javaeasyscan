@@ -74,7 +74,7 @@ public class ResultUtil {
                 writer.println("</head>");
                 writer.println("<body>");
                 writer.println("<div class='navbar'><div class='navbar-logo'>Fupo JavaEasyScanner</div><div class='navbar-menu'><a href='https://novysodope.github.io/'>Home</a><a href='https://github.com/novysodope'>Github</a><a href='https://github.com/novysodope/javaeasyscan' id='about-link'>About</a></div></div>");
-                writer.println("<h1>Detail report</h1>");
+                writer.println("<h1>Detailed report</h1>");
                 writer.println("<div class='modal' id='about-modal'><div class='modal-header'>关于富婆</div><div class='modal-content'>有关本工具的更多信息请移步到Github，如果可以，还可以顺便star一下，后续还会更新漏洞审计和优化分析流程</div><button class='modal-close'>Close</button></div>");
             }
 
