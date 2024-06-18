@@ -79,7 +79,7 @@ public class SQLInjectScan {
     }
 
     public static void main(String args) throws Exception {
-        logger.info("Starting mybatsicSQL module");
+        logger.info("Starting mybatisSQL module");
         File rootDir = new File(args);
         List<File> xmlFiles = new ArrayList<>();
         collectXmlFiles(rootDir, xmlFiles);
