@@ -66,7 +66,7 @@ public class ProductServiceImpl implements ProductService {
         }
     }
 ```
-这个跟进的操作会重复到往上再没有调用，且如果mybatsic xml文件存在注入写法，但是方法没有被调用，则工具就会忽略该场景
+这个跟进的操作会重复到往上再没有调用，且如果mybatis xml文件存在注入写法，但是方法没有被调用，则工具就会忽略该场景
 
 等所有漏洞扫描完后，会在当前目录生成一个***HTML报告***，报告示例：
 
@@ -75,7 +75,7 @@ public class ProductServiceImpl implements ProductService {
 ![image](https://github.com/novysodope/javaeasyscan/assets/45167857/71e07f90-44d4-4ea8-9e73-74334d5d379e)
 
 # 计划
-因为时间仓促，本工具只写了mybatis的SQL注入、JDBC拼接SQL注入、Fastjson反序列化、Groovy代码执行、命令注入五个模块，目前mybatsic的SQL注入模块比较完善
+因为时间仓促，本工具只写了mybatis的SQL注入、JDBC拼接SQL注入、Fastjson反序列化、Groovy代码执行、命令注入五个模块，目前mybatis的SQL注入模块比较完善
 
 ## 后续需要优化的地方：
 - 所有模块增加入参校验，如果参数不可控则忽略场景，减少误报
