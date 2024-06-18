@@ -75,7 +75,7 @@ public class ProductServiceImpl implements ProductService {
 ![image](https://github.com/novysodope/javaeasyscan/assets/45167857/71e07f90-44d4-4ea8-9e73-74334d5d379e)
 
 # 计划
-因为时间仓促，本工具只写了mybatsic的SQL注入、JDBC拼接SQL注入、Fastjson反序列化、Groovy代码执行、命令注入五个模块，目前mybatsic的SQL注入模块比较完善
+因为时间仓促，本工具只写了mybatis的SQL注入、JDBC拼接SQL注入、Fastjson反序列化、Groovy代码执行、命令注入五个模块，目前mybatsic的SQL注入模块比较完善
 
 ## 后续需要优化的地方：
 - 所有模块增加入参校验，如果参数不可控则忽略场景，减少误报
